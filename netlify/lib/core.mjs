@@ -148,9 +148,9 @@ export function createApp(db, env = () => undefined) {
     const ref = await db.getJSON('emails', email);
     const user = ref && (await db.getJSON('users', ref.id));
     await new Promise((r) => setTimeout(r, 250));
-    if (!user || !checkPassword(String(b.password || ''), user)) {
-      return fail(401, 'Email or password is not right. If you signed up with Google, use the Google button.');
-    }
+    if (!user) return fail(401, 'There is no account with this email on this site yet. Choose “Create an account” to make one.');
+    if (!user.hash) return fail(401, 'This account was made with Google. Use the Google button to sign in.');
+    if (!checkPassword(String(b.password || ''), user)) return fail(401, 'The password is not right. Try again.');
     return json(await startSession(user));
   });
 

@@ -27,3 +27,10 @@ addEventListener('error', (e) => console.error(e.error || e.message));
   onEvt('badges', (list) => { list.forEach((b) => toast(`${b.em} Badge earned: ${b.name}`, 'good')); confetti(90); });
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
+
+// Remove the "Powered by Netlify" badge Netlify may inject into the page.
+(function hideNetlifyBadge() {
+  const sweep = () => document.querySelectorAll('a[href*="netlify.com"], [id*="netlify" i], [class*="netlify" i], iframe[src*="netlify"]').forEach((el) => { if (!el.closest('#view')) el.style.setProperty('display', 'none', 'important'); });
+  new MutationObserver(sweep).observe(document.documentElement, { childList: true, subtree: true });
+  sweep();
+})();

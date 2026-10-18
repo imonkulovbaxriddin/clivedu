@@ -237,9 +237,8 @@ export function render(root, _p, query) {
   });
 
   // ----- HUD controls -----
-  const setChips = () => hud.replaceChildren(
-    h('button', { class: 'btn sm glass', onclick: () => { view.set = null; selected = null; closeCard(); fit(); setChips(); } }, icon('expand', 15), 'Fit all'),
-    ...world.clusters.map((c) => h('button', { class: `chip${view.set === c.set.id ? ' on' : ''}`, onclick: () => { view.set = view.set === c.set.id ? null : c.set.id; if (view.set) { cam.tx = c.cx; cam.ty = c.cy; cam.tz = Math.min(1.5, Math.min(W, H) / (c.r * 2 + 200)); } else fit(); setChips(); } }, `${c.set.emoji} ${c.set.title}`)));
+  // The set-filter chips were removed: they covered the sky on phones.
+  const setChips = () => { hud.replaceChildren(); hud.hidden = true; };
 
   // ----- word card -----
   function closeCard() { selected = null; review = review && review.idx < review.queue.length ? review : null; card.classList.remove('show'); }

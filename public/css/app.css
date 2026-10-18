@@ -413,3 +413,6 @@ kbd { font-family: inherit; font-size: .78rem; padding: 2px 7px; border-radius: 
 .lv-say { font-size: .82rem; font-style: italic; opacity: .8; flex-basis: 100%; }
 .sheet:has(.levels) { max-height: 92vh; overflow: auto; }
 .uz { color: var(--accent); font-weight: 700; }
+
+/* No Netlify badge, and no filter panel over the galaxy */
+a[href*="netlify.com"]:not(#view a), [id*="netlify" i], [class*="netlify" i], .gal-hud { display: none !important; }

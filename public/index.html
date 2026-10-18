@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en" data-theme="auto" data-reading="off">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ClivEdu - learn English among the stars</title>
+  <meta name="description" content="A personal English classroom: grammar and vocabulary lessons, a word galaxy that grows as you learn, games and homework.">
+  <meta name="theme-color" content="#0b0920">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=Figtree:wght@400;500;600;700&family=Literata:opsz,wght@7..72,400;7..72,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <script>
+    // Apply saved look before first paint so there is no flash.
+    try {
+      const s = JSON.parse(localStorage.getItem('clivedu:settings') || '{}');
+      const r = document.documentElement;
+      if (s.theme) r.dataset.theme = s.theme;
+      if (s.reading) r.dataset.reading = 'on';
+      if (s.motion) r.dataset.motion = s.motion;
+      if (s.accent) r.style.setProperty('--accent', s.accent);
+    } catch (e) {}
+  </script>
+</head>
+<body>
+  <canvas id="bg" aria-hidden="true"></canvas>
+  <canvas id="words" aria-hidden="true"></canvas>
+
+  <div id="app">
+    <header id="top"></header>
+    <main id="view" tabindex="-1"></main>
+    <nav id="dial" aria-label="Main navigation"></nav>
+  </div>
+
+  <div id="iris" aria-hidden="true"><div class="w"><b></b><small></small></div></div>
+  <div id="toasts" role="status" aria-live="polite"></div>
+  <div id="modal-root"></div>
+
+  <noscript><p style="padding:40px;position:relative;z-index:5">ClivEdu needs JavaScript. Please turn it on and reload.</p></noscript>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

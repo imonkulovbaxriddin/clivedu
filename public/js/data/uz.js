@@ -1,0 +1,91 @@
+// Uzbek (Latin) texts for the interface. Anything missing here simply stays in English.
+export const UZ = {
+  // menu and top bar
+  'Home': 'Bosh sahifa', 'Lessons': 'Darslar', 'Words': 'So‘zlar', 'Play': 'O‘yin', 'Homework': 'Uy vazifasi', 'Me': 'Men',
+  'Teacher desk': 'O‘qituvchi paneli', 'Settings': 'Sozlamalar', 'Log in': 'Kirish', 'Log out': 'Chiqish', 'Logged out': 'Chiqdingiz',
+  'Open menu': 'Menyuni ochish', 'Close menu': 'Menyuni yopish', 'Search (press /)': 'Qidirish (/ tugmasi)', 'Your profile': 'Profilingiz',
+  'Lesson': 'Dars', 'Lesson not found': 'Dars topilmadi', 'All lessons': 'Barcha darslar',
+
+  // sign up / log in
+  'Join the class': 'Guruhga qo‘shiling', 'Welcome back': 'Xush kelibsiz', 'Welcome back!': 'Qaytganingiz bilan!', 'Welcome to ClivEdu!': 'ClivEdu ga xush kelibsiz!',
+  'Make an account to get homework, unlock slides and keep your profile.': 'Uy vazifasini olish, slaydlarni ochish va profilingizni saqlash uchun hisob yarating.',
+  'Log in to see your homework and lessons.': 'Uy vazifasi va darslaringizni ko‘rish uchun kiring.',
+  'Name': 'Ism', 'Your full name': 'To‘liq ismingiz', 'Password': 'Parol', 'At least 8 characters': 'Kamida 8 ta belgi', 'Your password': 'Parolingiz',
+  'Create my account': 'Hisobimni yaratish', 'Create account': 'Hisob yaratish', 'Create an account': 'Hisob yaratish',
+  'Already have an account? ': 'Hisobingiz bormi? ', 'New here? ': 'Yangimisiz? ', 'or use email': 'yoki email orqali',
+  'Your learning progress is saved on this device. The account holds your name, profile and homework.': 'O‘qish natijangiz shu qurilmada saqlanadi. Hisobda ismingiz, profilingiz va uy vazifasi turadi.',
+  'What is your English level?': 'Ingliz tili darajangiz qanday?', 'Your English level': 'Ingliz tili darajangiz',
+  'Pick the box that sounds most like you. You can start with A1 if you are new.': 'O‘zingizga eng mos keladigan kartani tanlang. Yangi bo‘lsangiz, A1 dan boshlang.',
+  'Not sure? Choose A1. Your teacher will move you to the right level after your first lessons.': 'Ishonchingiz komil emasmi? A1 ni tanlang. O‘qituvchingiz birinchi darslardan keyin sizni to‘g‘ri darajaga o‘tkazadi.',
+  'Please choose a level.': 'Iltimos, darajani tanlang.', 'Please choose your English level below.': 'Iltimos, pastdan ingliz tili darajangizni tanlang.',
+  'Save my level': 'Darajamni saqlash', 'Level saved': 'Daraja saqlandi',
+  'My English level': 'Mening ingliz tili darajam', 'Your English level. Your teacher sets it.': 'Ingliz tili darajangiz. Uni o‘qituvchingiz belgilaydi.',
+  'Your teacher sets your level. Ask them if you think it should change.': 'Darajangizni o‘qituvchingiz belgilaydi. O‘zgarishi kerak deb o‘ylasangiz, undan so‘rang.',
+  'My level': 'Mening darajam', 'Show all levels': 'Barcha darajalarni ko‘rsatish', 'Any level': 'Istalgan daraja',
+
+  // home
+  'Your English, one star at a time.': 'Inglizcha — yulduzma-yulduz.', 'welcome': 'xush kelibsiz',
+  'Pick up where you left off, review the words that are fading, or just wander.': 'Qolgan joyingizdan davom eting, unutilayotgan so‘zlarni takrorlang yoki shunchaki sayr qiling.',
+  'Lessons from your teacher, a galaxy that grows with every word you learn, and games to play together.': 'O‘qituvchingizdan darslar, har bir yangi so‘z bilan kengayadigan galaktika va birga o‘ynaladigan o‘yinlar.',
+  'Start a lesson': 'Darsni boshlash', 'Continue': 'Davom etish', 'Open my galaxy': 'Galaktikamni ochish',
+  'Star of the day': 'Kun yulduzi', 'Tap the word to hear it and see what it means.': 'So‘zni bosing: eshiting va ma’nosini ko‘ring.',
+  'Save word': 'So‘zni saqlash', 'Saved to your words': 'So‘zlaringizga saqlandi', 'Removed from saved': 'Saqlanganlardan olib tashlandi', 'See it in the galaxy': 'Galaktikada ko‘rish',
+  'day streak': 'kunlik seriya', 'days streak': 'kunlik seriya', 'Level': 'Daraja', 'star discovered': 'yulduz topildi', 'stars discovered': 'yulduz topildi',
+  'words are fading. Tap to review.': 'ta so‘z unutilmoqda. Takrorlash uchun bosing.', 'words to review': 'takrorlanadigan so‘z',
+  'Grammar and vocabulary, with slides from your teacher.': 'Grammatika va lug‘at, o‘qituvchingizning slaydlari bilan.',
+  'Word Galaxy': 'So‘zlar galaktikasi', 'Every word is a star. Learn it and it shines.': 'Har bir so‘z — yulduz. O‘rgansangiz, u porlaydi.',
+  'Quick games to warm up your words.': 'So‘zlaringizni qizdiradigan tezkor o‘yinlar.', 'Nothing waiting. Nice.': 'Hech narsa kutmayapti. Zo‘r!', 'to do right now.': 'ta vazifa bajarilishi kerak.',
+
+  // lessons
+  'Grammar and vocabulary. Open any lesson for quick notes; slides unlock when your teacher shares them with you.': 'Grammatika va lug‘at. Qisqa izohlar uchun istalgan darsni oching; slaydlar o‘qituvchingiz ruxsat bergach ochiladi.',
+  'All': 'Hammasi', 'Grammar': 'Grammatika', 'Vocabulary': 'Lug‘at', 'Favorites': 'Sevimlilar', 'Search lessons': 'Darslarni qidirish',
+  'lesson': 'dars', 'lessons': 'dars', 'Vocabulary lesson': 'Lug‘at darsi', 'Grammar lesson': 'Grammatika darsi',
+  'No favorites yet': 'Hozircha sevimlilar yo‘q', 'No lessons match': 'Mos dars topilmadi',
+  'Tap the heart on any lesson to keep it here.': 'Istalgan darsdagi yurakchani bosing, u shu yerda saqlanadi.', 'Try a different level or clear the search.': 'Boshqa darajani tanlang yoki qidiruvni tozalang.',
+  'Learned': 'O‘rganildi', 'Slides open': 'Slaydlar ochiq', 'Preview': 'Namuna', 'Quick notes': 'Qisqa izohlar',
+  'Favorite this lesson': 'Bu darsni sevimlilarga qo‘shish', 'I learned this': 'Men buni o‘rgandim', 'Lesson marked as learned. +25 XP': 'Dars o‘rganildi deb belgilandi. +25 XP',
+  'Practise with a game': 'O‘yin bilan mashq qiling',
+  'Presentation': 'Taqdimot', 'PowerPoint presentation': 'PowerPoint taqdimoti', 'Download PowerPoint': 'PowerPoint ni yuklab olish', 'Downloaded': 'Yuklab olindi',
+  'Unlocks with the slides': 'Slaydlar bilan birga ochiladi', 'Loading slides…': 'Slaydlar yuklanmoqda…', 'This presentation is shared by your teacher.': 'Bu taqdimotni o‘qituvchingiz ulashadi.',
+  'Slide preview': 'Slayd namunasi', 'Previous slide': 'Oldingi slayd', 'Next slide': 'Keyingi slayd', 'Full screen': 'To‘liq ekran',
+  'The full presentation is locked': 'To‘liq taqdimot qulflangan',
+  'You are seeing a preview. Your teacher unlocks the whole deck for the students in class.': 'Siz faqat namunani ko‘ryapsiz. O‘qituvchingiz to‘liq taqdimotni guruh o‘quvchilari uchun ochadi.',
+  'Ask for access': 'Ruxsat so‘rash', 'Log in to ask for access': 'Ruxsat so‘rash uchun kiring', 'Requested': 'So‘rov yuborildi', 'Request sent. Your teacher will see it.': 'So‘rov yuborildi. O‘qituvchingiz ko‘radi.',
+
+  // words and games
+  'Every word is a star. Open it to discover it, get it right to make it shine, and come back before it fades.': 'Har bir so‘z — yulduz. Uni oching, to‘g‘ri javob bering — porlaydi. Xira tortishidan oldin qaytib keling.',
+  '🌌 Galaxy': '🌌 Galaktika', '☰ List': '☰ Ro‘yxat', '💜 Saved': '💜 Saqlangan', 'Saved': 'Saqlangan',
+  'Show meaning': 'Ma’nosini ko‘rsatish', 'I know it': 'Bilaman', 'Still learning': 'Hali o‘rganyapman', 'Similar': 'O‘xshash',
+  'Short games with your words. Every right answer helps a star shine in your galaxy.': 'So‘zlaringiz bilan qisqa o‘yinlar. Har bir to‘g‘ri javob galaktikangizdagi yulduzni porlatadi.',
+  'Class arena (group games)': 'Sinf arenasi (guruh o‘yinlari)', 'All words': 'Barcha so‘zlar', 'Best': 'Eng yaxshi',
+  'Quick quiz': 'Tezkor test', 'Read the meaning, pick the word before time runs out.': 'Ma’noni o‘qing, vaqt tugamasidan so‘zni tanlang.',
+  'Unscramble': 'Harflarni tering', 'Put the letters back in order. The meaning is your clue.': 'Harflarni to‘g‘ri tartibga keltiring. Ma’no sizga yordam beradi.',
+  'Star match': 'Yulduz juftlash', 'Connect each word to its meaning. Beat the clock.': 'Har bir so‘zni ma’nosi bilan juftlang. Vaqtdan oldin ulguring.',
+  'Listen & spell': 'Eshiting va yozing', 'Hear the word, type how it is spelled.': 'So‘zni eshiting va uni qanday yozilishini kiriting.',
+  'Show off my sky': 'Osmonimni ko‘rsatish',
+
+  // homework
+  'Your homework lives here': 'Uy vazifangiz shu yerda', 'Log in to see the tasks your teacher gives you.': 'O‘qituvchingiz bergan vazifalarni ko‘rish uchun kiring.',
+  'Tasks from your teacher. Tick them off when you are done.': 'O‘qituvchingizdan vazifalar. Bajarganingizda belgilab qo‘ying.',
+  'To do': 'Bajarilishi kerak', 'Done': 'Bajarildi', 'Nothing finished yet': 'Hali hech narsa bajarilmagan', 'You are all caught up': 'Hammasi bajarilgan',
+  'Completed homework will show up here.': 'Bajarilgan vazifalar shu yerda ko‘rinadi.', 'No homework waiting. Why not play a quick game?': 'Kutayotgan vazifa yo‘q. Tezkor o‘yin o‘ynasangiz-chi?',
+  'Play a game': 'O‘yin o‘ynash', 'Mark done': 'Bajarildi deb belgilash', 'Given': 'Berilgan', 'Due': 'Muddat', 'Was due': 'Muddati o‘tgan',
+  'Tell me when new homework arrives': 'Yangi uy vazifasi kelganda xabar bering',
+
+  // profile
+  'Progress': 'Natijalar', 'Customize': 'Sozlash', 'Learning right now': 'Hozir o‘rganayotganim', 'Continue lesson': 'Darsni davom ettirish',
+  'Stars discovered': 'Topilgan yulduzlar', 'Words mastered': 'O‘zlashtirilgan so‘zlar', 'This week': 'Shu hafta', 'Badges': 'Nishonlar',
+  'Open all homework': 'Barcha vazifalarni ochish', 'Save profile': 'Profilni saqlash', 'What should we call you?': 'Sizni qanday atashimiz kerak?',
+  'Avatar': 'Avatar', 'Colour': 'Rang', 'Frame': 'Ramka', 'to level': '→ daraja',
+
+  // settings
+  'Make ClivEdu feel like yours. Changes apply straight away.': 'ClivEdu ni o‘zingizga moslang. O‘zgarishlar darhol qo‘llanadi.',
+  'Language': 'Til', 'Website language': 'Sayt tili', 'Menus and buttons.': 'Menyu va tugmalar.', 'Word translations': 'So‘z tarjimalari',
+  'Show the Uzbek meaning of English words.': 'Inglizcha so‘zlarning o‘zbekcha ma’nosini ko‘rsatish.',
+  'Look': 'Ko‘rinish', 'Theme': 'Mavzu', 'Auto follows your device.': 'Avto — qurilmangizga mos.', 'Auto': 'Avto', 'Day': 'Kun', 'Night': 'Tun',
+  'Accent colour': 'Asosiy rang', 'Used for buttons, stars and highlights.': 'Tugmalar, yulduzlar va ajratmalar uchun ishlatiladi.',
+  'Reading mode': 'O‘qish rejimi', 'Quiet paper-like colours, a serif font and no moving background. Good for long notes.': 'Qog‘ozga o‘xshash xotirjam ranglar, serif shrift va harakatsiz fon. Uzun matnlar uchun qulay.',
+  'Calm motion': 'Sokin harakat', 'Fewer animations and a still background.': 'Kamroq animatsiya va harakatsiz fon.',
+  'Sound and alerts': 'Ovoz va bildirishnomalar', 'Game sounds': 'O‘yin ovozlari', 'Short sound effects for right and wrong answers.': 'To‘g‘ri va noto‘g‘ri javoblar uchun qisqa ovozlar.',
+  'Your progress': 'Natijangiz', 'Account': 'Hisob',
+};

@@ -100,7 +100,24 @@ export function render(root, _p, query) {
       h('div', { class: 'field' }, h('label', { for: 'bio' }, 'Short bio'), h('input', { id: 'bio', value: draft.bio, maxlength: 160, placeholder: 'e.g. Learning English for my university exams', oninput: (e) => { draft.bio = e.target.value; paintPreview(); } })),
       h('div', { class: 'field' }, h('label', { for: 'goal' }, 'My goal'), h('input', { id: 'goal', value: draft.goal, maxlength: 80, placeholder: 'e.g. IELTS 7.0 by June', oninput: (e) => { draft.goal = e.target.value; } })),
       h('div', { class: 'field' }, h('label', t('Avatar')), emojiBox), h('div', { class: 'field' }, h('label', t('Colour')), colorBox), h('div', { class: 'field' }, h('label', t('Frame')), frameBox),
-      err, h('div', { class: 'row' }, saveBtn));
+      err, h('div', { class: 'row' }, saveBtn),
+      passwordBox());
+  }
+
+  function passwordBox() {
+    const cur = h('input', { type: 'password', autocomplete: 'current-password', id: 'pw0' });
+    const nw = h('input', { type: 'password', autocomplete: 'new-password', id: 'pw1', minlength: 8 });
+    const msg = h('p', { class: 'error', role: 'alert' });
+    const go = h('button', { class: 'btn', onclick: async () => {
+      msg.textContent = ''; go.disabled = true;
+      try { await api.post('/api/me/password', { current: cur.value, next: nw.value }); cur.value = ''; nw.value = ''; toast(t('Password changed'), 'good'); } catch (e) { msg.textContent = e.message; }
+      go.disabled = false;
+    } }, t('Change password'));
+    return h('div', { class: 'stack', style: { borderTop: '1px solid var(--line)', paddingTop: '16px' } },
+      h('h3', { class: 'h3' }, t('Password')),
+      h('div', { class: 'field' }, h('label', { for: 'pw0' }, t('Current password (leave empty if you signed in with Google)')), cur),
+      h('div', { class: 'field' }, h('label', { for: 'pw1' }, t('New password (at least 8 characters)')), nw),
+      msg, h('div', { class: 'row' }, go));
   }
 
   root.append(top, tabs, body);

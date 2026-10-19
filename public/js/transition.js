@@ -34,14 +34,14 @@ export async function transition(swap, { quick = false } = {}) {
   s.textContent = def;
   el.style.visibility = 'visible';
 
-  const open = el.animate([{ clipPath: `circle(0px at ${ox}px ${oy}px)` }, { clipPath: `circle(${R}px at ${ox}px ${oy}px)` }], { duration: quick ? 360 : 520, easing: 'cubic-bezier(.7,0,.2,1)', fill: 'forwards' });
+  const open = el.animate([{ clipPath: `circle(0px at ${ox}px ${oy}px)` }, { clipPath: `circle(${R}px at ${ox}px ${oy}px)` }], { duration: quick ? 280 : 400, easing: 'cubic-bezier(.7,0,.2,1)', fill: 'forwards' });
   await open.finished;
   const letters = [...b.children];
   letters.forEach((sp, i) => sp.animate([{ opacity: 0, transform: 'translateY(30px) rotate(6deg)' }, { opacity: 1, transform: 'none' }], { duration: 480, delay: i * 38, easing: 'cubic-bezier(.34,1.56,.64,1)', fill: 'forwards' }));
   s.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 400, delay: 180 + letters.length * 30, fill: 'forwards' });
   await swap();
-  await new Promise((r) => setTimeout(r, quick ? 380 : 780));
-  const close = el.animate([{ clipPath: `circle(${R}px at 50% 50%)` }, { clipPath: 'circle(0px at 50% 50%)' }], { duration: 560, easing: 'cubic-bezier(.7,0,.2,1)', fill: 'forwards' });
+  await new Promise((r) => setTimeout(r, quick ? 260 : 480));
+  const close = el.animate([{ clipPath: `circle(${R}px at 50% 50%)` }, { clipPath: 'circle(0px at 50% 50%)' }], { duration: 380, easing: 'cubic-bezier(.7,0,.2,1)', fill: 'forwards' });
   await close.finished;
   el.getAnimations().forEach((a) => a.cancel());
   b.querySelectorAll('span').forEach((sp) => sp.getAnimations().forEach((a) => a.cancel()));

@@ -8,6 +8,7 @@ import { startHomeworkWatcher } from './notify.js';
 import { toast, confetti, modal, h } from './ui.js';
 import { on as onEvt, getUser } from './store.js';
 import { askLevelOnce } from './levelpicker.js';
+import { startSync } from './sync.js';
 
 applySettings();
 addEventListener('error', (e) => console.error(e.error || e.message));
@@ -38,6 +39,7 @@ function askPerfOnce(next) {
   initPalette();
   await initRouter();
   startHomeworkWatcher();
+  startSync();
   askPerfOnce(() => askLevelOnce(getUser()));
   onEvt('session', (s) => { if (s?.user) setTimeout(() => askLevelOnce(getUser()), 600); });
   onEvt('badges', (list) => { list.forEach((b) => toast(`${b.em} Badge earned: ${b.name}`, 'good')); confetti(90); });

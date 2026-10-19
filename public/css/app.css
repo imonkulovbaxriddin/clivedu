@@ -416,3 +416,8 @@ kbd { font-family: inherit; font-size: .78rem; padding: 2px 7px; border-radius: 
 
 /* No Netlify badge, and no filter panel over the galaxy */
 a[href*="netlify.com"]:not(#view a), [id*="netlify" i], [class*="netlify" i], .gal-hud { display: none !important; }
+
+/* The page-name label next to the orb fades after a moment so it never sits on top of content */
+@keyframes orb-label-out { 0%, 70% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
+.orb-label { animation: orb-label-out 3.2s forwards; }
+#dial:hover .orb-label, #dial:focus-within .orb-label { animation: none; opacity: 1; visibility: visible; }

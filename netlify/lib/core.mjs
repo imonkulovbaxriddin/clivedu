@@ -80,8 +80,13 @@ export function createApp(db, env = () => undefined) {
   async function roleForNewUser(email) {
     const teacherEmail = (env('TEACHER_EMAIL') || '').toLowerCase().trim();
     if (teacherEmail) return teacherEmail === email ? 'teacher' : 'student';
+    // Without TEACHER_EMAIL the very first account becomes the teacher. A claim record makes sure only one ever does.
     const existing = await db.keys('users');
-    return existing.length === 0 ? 'teacher' : 'student';
+    if (existing.length === 0 && !(await db.getJSON('config', 'teacher-claim'))) {
+      await db.setJSON('config', 'teacher-claim', { at: now() });
+      return 'teacher';
+    }
+    return 'student';
   }
   async function createUser({ email, fullName, password, googleSub, picture, level }) {
     const id = uid();
@@ -103,6 +108,20 @@ export function createApp(db, env = () => undefined) {
     const u = await authUser(req);
     return u && u.role === 'teacher' ? u : null;
   };
+
+  const emailKey = (email) => crypto.createHash('sha256').update(email).digest('hex').slice(0, 40);
+  const LOCK_AFTER = 6, LOCK_MS = 10 * 60 * 1000;
+  async function lockedOut(email) {
+    const r = await db.getJSON('attempts', emailKey(email));
+    return !!r && r.n >= LOCK_AFTER && now() - r.t < LOCK_MS;
+  }
+  async function noteFailure(email) {
+    const k = emailKey(email);
+    const r = (await db.getJSON('attempts', k)) || { n: 0, t: 0 };
+    await db.setJSON('attempts', k, { n: now() - r.t > LOCK_MS ? 1 : r.n + 1, t: now() });
+  }
+  const clearFailures = (email) => db.del('attempts', emailKey(email));
+  const goodPassword = (pw) => String(pw || '').length >= 8 && String(pw).length <= 200;
 
   async function lessonAccess(lesson, user) {
     if (lesson.access !== 'private') return true;
@@ -148,9 +167,11 @@ export function createApp(db, env = () => undefined) {
     const ref = await db.getJSON('emails', email);
     const user = ref && (await db.getJSON('users', ref.id));
     await new Promise((r) => setTimeout(r, 250));
+    if (user && (await lockedOut(email))) return fail(429, 'Too many wrong passwords. Wait 10 minutes and try again, or ask your teacher to reset your password.');
     if (!user) return fail(401, 'There is no account with this email on this site yet. Choose “Create an account” to make one.');
     if (!user.hash) return fail(401, 'This account was made with Google. Use the Google button to sign in.');
-    if (!checkPassword(String(b.password || ''), user)) return fail(401, 'The password is not right. Try again.');
+    if (!checkPassword(String(b.password || ''), user)) { await noteFailure(email); return fail(401, 'The password is not right. Try again.'); }
+    await clearFailures(email);
     return json(await startSession(user));
   });
 
@@ -201,6 +222,36 @@ export function createApp(db, env = () => undefined) {
     return json({ user: publicUser(u) });
   });
 
+  route('POST', '/api/me/password', async (req) => {
+    const u = await authUser(req);
+    if (!u) return fail(401, 'Please log in.');
+    const b = await req.json().catch(() => ({}));
+    if (u.hash && !checkPassword(String(b.current || ''), u)) { await noteFailure(u.email); return fail(403, 'Your current password is not right.'); }
+    if (!goodPassword(b.next)) return fail(400, 'Use a new password with at least 8 characters.');
+    Object.assign(u, hashPassword(String(b.next)));
+    await db.setJSON('users', u.id, u);
+    await clearFailures(u.email);
+    return json({ ok: true });
+  });
+
+  // learning progress (XP, streaks, words, badges) kept on the account so it follows the student to any device
+  route('GET', '/api/me/progress', async (req) => {
+    const u = await authUser(req);
+    if (!u) return fail(401, 'Please log in.');
+    return json({ progress: (await db.getJSON('progress', u.id)) || null });
+  });
+  route('PUT', '/api/me/progress', async (req) => {
+    const u = await authUser(req);
+    if (!u) return fail(401, 'Please log in.');
+    const text = await req.text();
+    if (text.length > 400000) return fail(413, 'Progress is too large.');
+    let b; try { b = JSON.parse(text); } catch { return fail(400, 'Bad progress.'); }
+    const d = b && b.data;
+    if (!d || typeof d !== 'object' || Array.isArray(d)) return fail(400, 'Bad progress.');
+    await db.setJSON('progress', u.id, { data: d, updated: now() });
+    return json({ ok: true });
+  });
+
   route('PATCH', '/api/me', async (req) => {
     const u = await authUser(req);
     if (!u) return fail(401, 'Please log in.');
@@ -225,7 +276,12 @@ export function createApp(db, env = () => undefined) {
       .filter((l) => l.published !== false || user?.role === 'teacher')
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.title.localeCompare(b.title));
     const out = [];
-    for (const l of lessons) out.push({ ...l, unlocked: await lessonAccess(l, user) });
+    for (const l of lessons) {
+      const unlocked = await lessonAccess(l, user);
+      const item = { ...l, unlocked };
+      if (!unlocked && l.notesOpen === false) { item.noteCount = (l.notes || []).length; item.notes = []; }
+      out.push(item);
+    }
     const vocab = (await allOf('vocab')).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     const meta = (await db.getJSON('config', 'site')) || {};
     return json({ lessons: out, vocab, site: meta, serverTime: now() });
@@ -297,6 +353,11 @@ export function createApp(db, env = () => undefined) {
   route('GET', '/api/admin/overview', async (req) => {
     if (!(await requireTeacher(req))) return fail(403, 'Teacher access only.');
     const students = (await allOf('users')).map((u) => ({ id: u.id, email: u.email, displayName: u.displayName, fullName: u.fullName, role: u.role, created: u.created, avatar: u.avatar, level: u.level || 'A1', levelSet: !!u.levelSet }));
+    for (const s of students) {
+      const pr = await db.getJSON('progress', s.id);
+      const d = pr && pr.data;
+      Object.assign(s, { xp: d?.xp || 0, streak: d?.streak?.count || 0, words: d?.words ? Object.keys(d.words).length : 0, active: pr?.updated || null });
+    }
     const access = {};
     for (const l of await allOf('lessons')) access[l.id] = (await db.getJSON('access', l.id)) || { all: false, users: [] };
     const requests = await allOf('requests');
@@ -317,6 +378,18 @@ export function createApp(db, env = () => undefined) {
     return json({ ok: true, level });
   });
 
+  route('POST', '/api/admin/student/password', async (req) => {
+    if (!(await requireTeacher(req))) return fail(403, 'Teacher access only.');
+    const b = await req.json().catch(() => ({}));
+    const u = await db.getJSON('users', clean(b.userId, 40));
+    if (!u) return fail(404, 'Student not found.');
+    if (!goodPassword(b.password)) return fail(400, 'Use a password with at least 8 characters.');
+    Object.assign(u, hashPassword(String(b.password)));
+    await db.setJSON('users', u.id, u);
+    await clearFailures(u.email);
+    return json({ ok: true });
+  });
+
   route('PUT', '/api/admin/lesson', async (req) => {
     if (!(await requireTeacher(req))) return fail(403, 'Teacher access only.');
     const b = await req.json().catch(() => ({}));
@@ -332,6 +405,7 @@ export function createApp(db, env = () => undefined) {
       emoji: clean(b.emoji, 8) || '📘',
       notes: Array.isArray(b.notes) ? b.notes.slice(0, 12).map((n) => ({ h: clean(n.h, 80), t: clean(n.t, 400), ex: clean(n.ex, 200), uz: clean(n.uz, 500) })) : (prev.notes || []),
       access: b.access === 'open' ? 'open' : 'private',
+      notesOpen: b.notesOpen !== false,
       published: b.published !== false,
       order: Number.isFinite(+b.order) ? +b.order : (prev.order ?? 100),
       updated: now(),
@@ -349,6 +423,9 @@ export function createApp(db, env = () => undefined) {
     await db.del('access', p.id);
     await db.del('files', p.id);
     await db.del('files', `${p.id}.pptx`);
+    const own = new RegExp('^' + p.id.replace(/[^a-z0-9-]/gi, '') + '-\\d+$');
+    for (const k of await db.keys('previews', `${p.id}-`)) if (own.test(k)) await db.del('previews', k);
+    for (const k of await db.keys('chunks', `${p.id}.`)) await db.del('chunks', k);
     return json({ ok: true });
   });
 
@@ -359,7 +436,7 @@ export function createApp(db, env = () => undefined) {
     const upload = clean(url.searchParams.get('upload'), 30).replace(/[^a-z0-9]/gi, '');
     const i = parseInt(url.searchParams.get('i'), 10);
     if (!upload || !(i >= 0)) return fail(400, 'Bad chunk.');
-    await db.setBin('chunks', `${upload}-${i}`, new Uint8Array(await req.arrayBuffer()));
+    await db.setBin('chunks', `${p.id}.${upload}-${i}`, new Uint8Array(await req.arrayBuffer()));
     return json({ ok: true });
   });
   route('POST', '/api/admin/lesson/:id/finish', async (req, p) => {
@@ -371,7 +448,7 @@ export function createApp(db, env = () => undefined) {
     if (!lesson) return fail(404, 'Save the lesson first.');
     const parts = [];
     for (let i = 0; i < n; i++) {
-      const part = await db.getBin('chunks', `${upload}-${i}`);
+      const part = await db.getBin('chunks', `${p.id}.${upload}-${i}`);
       if (!part) return fail(400, `Chunk ${i} is missing. Upload again.`);
       parts.push(part);
     }
@@ -381,12 +458,13 @@ export function createApp(db, env = () => undefined) {
     for (const x of parts) { whole.set(x, off); off += x.length; }
     const head = String.fromCharCode(whole[0], whole[1], whole[2], whole[3]);
     const isPptx = b.kind === 'pptx';
-    if (isPptx ? head !== 'PK\x03\x04' : head !== '%PDF') {
-      for (let i = 0; i < n; i++) await db.del('chunks', `${upload}-${i}`);
+    const looksPptx = isPptx && head === 'PK\x03\x04' && Buffer.from(whole.buffer, whole.byteOffset, whole.length).includes('ppt/');
+    if (isPptx ? !looksPptx : head !== '%PDF') {
+      for (let i = 0; i < n; i++) await db.del('chunks', `${p.id}.${upload}-${i}`);
       return fail(400, isPptx ? 'This file is not a PowerPoint (.pptx) file.' : 'This file is not a PDF. In PowerPoint use File > Export > PDF.');
     }
     await db.setBin('files', isPptx ? `${p.id}.pptx` : p.id, whole);
-    for (let i = 0; i < n; i++) await db.del('chunks', `${upload}-${i}`);
+    for (let i = 0; i < n; i++) await db.del('chunks', `${p.id}.${upload}-${i}`);
     if (isPptx) Object.assign(lesson, { hasPptx: true, pptxName: clean(b.name, 80) || `${p.id}.pptx`, pptxBytes: total, updated: now() });
     else Object.assign(lesson, { hasFile: true, pages: parseInt(b.pages, 10) || lesson.pages, bytes: total, updated: now() });
     await db.setJSON('lessons', p.id, lesson);

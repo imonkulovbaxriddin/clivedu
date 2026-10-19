@@ -52,7 +52,7 @@ export async function render(root) {
   }
 
   function lessonEditor(existing) {
-    const l = existing ? JSON.parse(JSON.stringify(existing)) : { id: '', title: '', emoji: '📘', kind: 'grammar', level: 'A2', summary: '', notes: [], access: 'private', published: true, order: (content.lessons.length + 1) * 10 };
+    const l = existing ? JSON.parse(JSON.stringify(existing)) : { id: '', title: '', emoji: '📘', kind: 'grammar', level: 'A2', summary: '', notes: [], access: 'private', notesOpen: true, published: true, order: (content.lessons.length + 1) * 10 };
     modal((sheet, close) => {
       const f = (label, el, hint) => h('div', { class: 'field' }, h('label', label), el, hint ? h('span', { class: 'hint' }, hint) : null);
       const inp = (key, props = {}) => h('input', { value: l[key] ?? '', oninput: (e) => { l[key] = e.target.value; }, ...props });
@@ -64,6 +64,7 @@ export async function render(root) {
         h('textarea', { placeholder: 'Uzbek explanation (optional, shown to students)', style: { minHeight: '50px' }, oninput: (e) => (n.uz = e.target.value) }, n.uz || ''),
         h('button', { class: 'btn sm ghost danger', style: { justifySelf: 'start' }, onclick: () => { l.notes.splice(i, 1); paintNotes(); } }, 'Remove note'))), h('button', { class: 'btn sm', style: { justifySelf: 'start' }, onclick: () => { l.notes.push({ h: '', t: '', ex: '', uz: '' }); paintNotes(); } }, '+ Add note'));
       paintNotes();
+      if (l.notesOpen === undefined) l.notesOpen = true;
       const seg = (key, opts) => { const b = h('div', { class: 'seg' }); const p = () => b.replaceChildren(...opts.map(([v, t]) => h('button', { type: 'button', 'aria-pressed': String(l[key] === v), onclick: () => { l[key] = v; p(); } }, t))); p(); return b; };
       const err = h('p', { class: 'error', role: 'alert' });
       const prog = h('div', { class: 'timer', style: { display: 'none' } }, h('i', { style: { transform: 'scaleX(0)', animation: 'none' } }));
@@ -114,6 +115,7 @@ export async function render(root) {
           f('Summary in Uzbek (optional)', inp('summaryUz', { placeholder: 'Qisqacha izoh', maxlength: 300 })),
           h('div', { class: 'row' }, f('Type', seg('kind', [['grammar', 'Grammar'], ['vocab', 'Vocabulary']])), f('Level', inp('level', { style: { width: '90px' }, placeholder: 'B1' })), f('Order', inp('order', { type: 'number', style: { width: '100px' } }))),
           f('Who can open the slides?', seg('access', [['private', '🔒 Only students I grant'], ['open', 'Everyone']]), 'Locked lessons show a preview to everyone else. Grant access in the Students tab.'),
+          f('Quick notes of a locked lesson', seg('notesOpen', [[true, '👀 Free preview for everyone'], [false, '🔒 Hidden until access']]), 'Quick notes appear on the lesson page. Hide them if they give away what the slides teach.'),
           h('label', { class: 'row' }, h('input', { type: 'checkbox', checked: l.published !== false, onchange: (e) => (l.published = e.target.checked) }), 'Published (uncheck to keep it as a draft only you can see)'),
           h('hr', { style: { border: 0, borderTop: '1px solid var(--line)', width: '100%' } }),
           h('h3', { class: 'h3' }, 'Presentation: PDF and PowerPoint'),
@@ -202,6 +204,12 @@ export async function render(root) {
     const grant = ov.access[accessLesson] || { all: false, users: [] };
     const toggle = async (userId, on) => { try { await api.post('/api/admin/access', { lessonId: accessLesson, userId, grant: on }); await refresh(); } catch (e) { toast(e.message, 'bad'); } };
     const sw = (checked, fn, label) => h('label', { class: 'switch' }, h('input', { type: 'checkbox', checked, 'aria-label': label, onchange: (e) => fn(e.target.checked) }), h('span'));
+    const progressCell = (u) => h('div', { class: 'small' }, `${u.xp || 0} XP`, h('div', { class: 'muted' }, `🔥 ${u.streak || 0} · ⭐ ${u.words || 0} words`, u.active ? ` · ${fmtDate(u.active)}` : ''));
+    const pwBtn = (u) => h('button', { class: 'btn sm', onclick: async () => {
+      const pw = prompt(`New temporary password for ${u.displayName} (at least 8 characters). Tell it to the student; they can change it in their profile.`);
+      if (!pw) return;
+      try { await api.post('/api/admin/student/password', { userId: u.id, password: pw }); toast(`Password changed for ${u.displayName}`, 'good'); } catch (ex) { toast(ex.message, 'bad'); }
+    } }, 'Reset');
     return h('div', { class: 'stack' },
       ov.requests.length ? h('section', { class: 'glass card stack', style: { borderColor: 'var(--gold)' } }, h('h2', { class: 'h2' }, 'Waiting for access'),
         ov.requests.map((r) => { const u = ov.students.find((x) => x.id === r.userId); const les = content.lessons.find((x) => x.id === r.lessonId); return h('div', { class: 'row between' }, h('span', h('b', u?.displayName || 'A student'), ` asked for “${les?.title || r.lessonId}” · ${fmtDateTime(r.at)}`), h('button', { class: 'btn sm primary', onclick: async () => { await api.post('/api/admin/access', { lessonId: r.lessonId, userId: r.userId, grant: true }); toast('Access granted', 'good'); refresh(); } }, 'Approve')); })) : null,
@@ -213,10 +221,10 @@ export async function render(root) {
           : h('p', { class: 'muted' }, 'You have no locked lessons yet. Create a lesson and keep “Only students I grant” selected.')),
       h('section', { class: 'glass card stack' }, h('h2', { class: 'h2' }, 'Student levels'),
         h('p', { class: 'muted' }, 'Students choose a starting level when they sign up. After you place them in your group, set the right level here. They cannot change it themselves.'),
-        studs.length ? h('table', { class: 'table' }, h('thead', h('tr', h('th', 'Student'), h('th', 'Joined'), h('th', 'Level'))),
+        studs.length ? h('table', { class: 'table' }, h('thead', h('tr', h('th', 'Student'), h('th', 'Joined'), h('th', 'Level'), h('th', 'Progress'), h('th', 'Password'))),
           h('tbody', studs.map((u) => h('tr', h('td', h('div', { class: 'row', style: { flexWrap: 'nowrap' } }, avatarEl(u), h('div', h('b', u.displayName), h('div', { class: 'small muted' }, u.email)))), h('td', fmtDate(u.created)),
             h('td', h('select', { 'aria-label': `Level for ${u.displayName}`, style: { width: 'auto' }, onchange: async (e) => { try { await api.put('/api/admin/student', { userId: u.id, level: e.target.value }); u.level = e.target.value; toast(`${u.displayName} is now ${e.target.value}`, 'good'); } catch (ex) { toast(ex.message, 'bad'); } } },
-              LEVELS.map((lv) => h('option', { value: lv.id, selected: lv.id === (u.level || 'A1') }, `${lv.id} · ${lv.name}`))))))))
+              LEVELS.map((lv) => h('option', { value: lv.id, selected: lv.id === (u.level || 'A1') }, `${lv.id} · ${lv.name}`)))), h('td', progressCell(u)), h('td', pwBtn(u))))))
           : h('p', { class: 'muted' }, 'No students have signed up yet. Share your site link with the class.')));
   }
 

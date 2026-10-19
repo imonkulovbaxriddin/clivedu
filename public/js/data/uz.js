@@ -88,4 +88,7 @@ export const UZ = {
   'Calm motion': 'Sokin harakat', 'Fewer animations and a still background.': 'Kamroq animatsiya va harakatsiz fon.',
   'Sound and alerts': 'Ovoz va bildirishnomalar', 'Game sounds': 'O‘yin ovozlari', 'Short sound effects for right and wrong answers.': 'To‘g‘ri va noto‘g‘ri javoblar uchun qisqa ovozlar.',
   'Your progress': 'Natijangiz', 'Account': 'Hisob',
+  'Password': 'Parol', 'Change password': 'Parolni o‘zgartirish', 'Password changed': 'Parol o‘zgartirildi',
+  'Current password (leave empty if you signed in with Google)': 'Hozirgi parol (Google bilan kirgan bo‘lsangiz, bo‘sh qoldiring)',
+  'New password (at least 8 characters)': 'Yangi parol (kamida 8 ta belgi)',
 };

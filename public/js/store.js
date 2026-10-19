@@ -58,6 +58,7 @@ export function D() {
   if (!data) data = { ...blank(), ...read(dataKey(), {}) };
   return data;
 }
+export function replaceData(obj) { data = { ...blank(), ...obj }; write(dataKey(), data); emit('data', data); }
 export function save() { write(dataKey(), D()); emit('data', D()); }
 
 export const todayKey = (d = new Date()) => {

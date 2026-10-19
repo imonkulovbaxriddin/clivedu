@@ -184,14 +184,28 @@ export function render(root, _p, query) {
       }
     }
     // constellation names when zoomed out
-    if (cam.z < .85) for (const c of world.clusters) {
-      if (view.set && c.set.id !== view.set) continue;
-      const [sx, sy] = toScreen(c.cx, c.cy - c.r - 36);
-      const known = c.stars.filter((s) => d.words[s.key]?.seen).length;
-      ctx.textAlign = 'center'; ctx.fillStyle = ink; ctx.globalAlpha = Math.min(1, (.85 - cam.z) * 4);
-      ctx.font = '800 17px "Bricolage Grotesque", system-ui, sans-serif'; ctx.fillText(`${c.set.emoji} ${c.set.title}`, sx, sy);
-      ctx.font = '500 12px system-ui, sans-serif'; ctx.fillText(`${known} / ${c.stars.length} discovered`, sx, sy + 18);
-      ctx.globalAlpha = 1; ctx.textAlign = 'start';
+    if (cam.z < .85) {
+      // Greedy placement: a name is skipped when it would land on one already drawn, so phones stay readable.
+      const placed = [], big = W < 520;
+      const fs = big ? 13 : 17;
+      ctx.textAlign = 'center';
+      const order = world.clusters.filter((c) => !view.set || c.set.id === view.set).map((c) => ({ c, p: toScreen(c.cx, c.cy - c.r - 36) }))
+        .sort((a, b) => Math.hypot(a.p[0] - W / 2, a.p[1] - H / 2) - Math.hypot(b.p[0] - W / 2, b.p[1] - H / 2));
+      for (const { c, p: [sx, sy] } of order) {
+        const label = `${c.set.emoji} ${c.set.title}`;
+        ctx.font = `800 ${fs}px "Bricolage Grotesque", system-ui, sans-serif`;
+        const w = ctx.measureText(label).width + 12, hgt = big ? 20 : 38;
+        const box = [sx - w / 2, sy - fs, sx + w / 2, sy + hgt - fs];
+        if (box[0] < 0 || box[2] > W || box[1] < 0 || box[3] > H) continue;
+        if (placed.some((q) => box[0] < q[2] && box[2] > q[0] && box[1] < q[3] && box[3] > q[1])) continue;
+        placed.push(box);
+        const known = c.stars.filter((s) => d.words[s.key]?.seen).length;
+        ctx.fillStyle = ink; ctx.globalAlpha = Math.min(1, (.85 - cam.z) * 4);
+        ctx.fillText(label, sx, sy);
+        if (!big) { ctx.font = '500 12px system-ui, sans-serif'; ctx.fillText(`${known} / ${c.stars.length} discovered`, sx, sy + 18); }
+        ctx.globalAlpha = 1;
+      }
+      ctx.textAlign = 'start';
     }
   }
   const loop = (t) => { if (!running) return; draw(t); raf = requestAnimationFrame(loop); };

@@ -1,7 +1,7 @@
 import { getSession, setSession, content, emit } from './store.js';
 import { SEED_LESSONS, SEED_VOCAB } from './data/seed.js';
 
-export const net = { backend: null, googleClientId: null };
+export const net = { backend: null, googleClientId: null, groups: [], askGroup: false, signupOpen: true, welcome: '' };
 
 async function request(method, path, body, opts = {}) {
   const headers = {};
@@ -36,6 +36,7 @@ export async function boot() {
     const cfg = await api.get('/api/config');
     net.backend = true;
     net.googleClientId = cfg.googleClientId;
+    net.groups = cfg.groups || []; net.askGroup = !!cfg.askGroup; net.signupOpen = cfg.signupOpen !== false; net.welcome = cfg.welcome || '';
   } catch { net.backend = false; }
   await loadContent();
   if (net.backend && getSession()) {
@@ -61,7 +62,7 @@ export async function loadContent() {
 
 // Sign in helpers
 export async function login(email, password) { setSession(await api.post('/api/auth/login', { email, password })); }
-export async function register(name, email, password, level) { setSession(await api.post('/api/auth/register', { name, email, password, level })); }
+export async function register(name, email, password, pick) { setSession(await api.post('/api/auth/register', { name, email, password, ...(pick || {}) })); }
 export async function googleLogin(credential) { setSession(await api.post('/api/auth/google', { credential })); }
 export function logout() { setSession(null); }
 

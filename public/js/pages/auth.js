@@ -3,7 +3,7 @@ import { getUser, on } from '../store.js';
 import { net, login, register, googleLogin, loadGoogle } from '../api.js';
 import { go } from '../router.js';
 import { t } from '../i18n.js';
-import { levelPicker } from '../levelpicker.js';
+import { levelPicker, groupPicker } from '../levelpicker.js';
 
 export function render(root, _p, query) {
   if (getUser()) { go('/me'); return; }
@@ -15,17 +15,18 @@ export function render(root, _p, query) {
   const paint = () => {
     const signup = mode === 'signup';
     const name = h('input', { id: 'f-name', autocomplete: 'name', placeholder: t('Your full name'), required: true });
-    const picker = signup ? levelPicker(null) : null;
+    const useGroups = net.askGroup && net.groups.length > 0;
+    const picker = signup ? (useGroups ? groupPicker(null) : levelPicker(null)) : null;
     const email = h('input', { id: 'f-email', type: 'email', autocomplete: 'email', placeholder: 'you@example.com', required: true });
     const pass = h('input', { id: 'f-pass', type: 'password', autocomplete: signup ? 'new-password' : 'current-password', placeholder: signup ? t('At least 8 characters') : t('Your password'), required: true, minlength: signup ? 8 : 1 });
     const submit = h('button', { class: 'btn primary', type: 'submit', style: { width: '100%' } }, signup ? t('Create my account') : t('Log in'));
     const form = h('form', { class: 'stack', novalidate: true, onsubmit: async (e) => {
       e.preventDefault(); err.textContent = '';
       if (!net.backend) { err.textContent = 'The account server is not running. See the README to start it.'; return; }
-      if (signup && !picker.get()) { err.textContent = t('Please choose your English level below.'); return; }
+      if (signup && !picker.get()) { err.textContent = useGroups ? t('Please choose your group below.') : t('Please choose your English level below.'); return; }
       submit.disabled = true;
       try {
-        signup ? await register(name.value, email.value, pass.value, picker.get()) : await login(email.value, pass.value);
+        signup ? await register(name.value, email.value, pass.value, useGroups ? { groupId: picker.get() } : { level: picker.get() }) : await login(email.value, pass.value);
         toast(signup ? t('Welcome to ClivEdu!') : t('Welcome back!'), 'good');
         go(next);
       } catch (ex) { err.textContent = ex.message; submit.disabled = false; }
@@ -33,12 +34,14 @@ export function render(root, _p, query) {
       signup ? h('div', { class: 'field' }, h('label', { for: 'f-name' }, t('Name')), name) : null,
       h('div', { class: 'field' }, h('label', { for: 'f-email' }, 'Email'), email),
       h('div', { class: 'field' }, h('label', { for: 'f-pass' }, t('Password')), pass),
-      signup ? h('div', { class: 'field' }, h('label', t('What is your English level?')), picker.el) : null,
+      signup ? h('div', { class: 'field' }, h('label', useGroups ? t('Which group are you in?') : t('What is your English level?')), picker.el) : null,
       err, submit);
 
     const gBox = h('div', { style: { display: 'grid', justifyItems: 'center', minHeight: '44px' } });
     card.replaceChildren(
       h('h1', { class: 'h1' }, signup ? t('Join the class') : t('Welcome back')),
+      net.welcome ? h('p', { class: 'chip on', style: { whiteSpace: 'normal' } }, net.welcome) : null,
+      !net.signupOpen && signup ? h('p', { class: 'error' }, t('Sign-up is closed right now. Ask your teacher.')) : null,
       h('p', { class: 'muted' }, signup ? t('Make an account to get homework, unlock slides and keep your profile.') : t('Log in to see your homework and lessons.')),
       net.googleClientId ? gBox : null,
       net.googleClientId ? h('div', { class: 'divider' }, t('or use email')) : null,

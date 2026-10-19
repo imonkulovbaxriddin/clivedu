@@ -21,6 +21,14 @@ const now = () => Date.now();
 const clean = (s, max = 200) => String(s ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, max);
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1'];
+const DEFAULT_GROUPS = [
+  { id: 'beginner', name: 'Beginner', level: 'A1' },
+  { id: 'elementary', name: 'Elementary', level: 'A2' },
+  { id: 'intermediate', name: 'Intermediate', level: 'B1' },
+  { id: 'upper-intermediate', name: 'Upper-intermediate', level: 'B2' },
+  { id: 'advanced', name: 'Advanced', level: 'C1' },
+];
+const DEFAULT_SETTINGS = { signupOpen: true, askGroup: true, studentsChangeGroup: false, newLessonAccess: 'private', hwDefaultDays: 3, welcome: '' };
 const pickLevel = (v) => (LEVELS.includes(String(v).toUpperCase()) ? String(v).toUpperCase() : null);
 
 function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
@@ -72,7 +80,7 @@ export function createApp(db, env = () => undefined) {
   }
   const publicUser = (u) => ({
     id: u.id, email: u.email, role: u.role, displayName: u.displayName, fullName: u.fullName,
-    avatar: u.avatar, bio: u.bio, goal: u.goal, level: u.level || 'A1', levelSet: !!u.levelSet, created: u.created, google: !!u.googleSub, picture: u.picture || null,
+    avatar: u.avatar, bio: u.bio, goal: u.goal, level: u.level || 'A1', levelSet: !!u.levelSet, groupId: u.groupId || null, groupSet: !!u.groupSet, created: u.created, google: !!u.googleSub, picture: u.picture || null,
   });
   async function startSession(u) {
     return { token: await sign({ sub: u.id }), user: publicUser(u) };
@@ -88,14 +96,14 @@ export function createApp(db, env = () => undefined) {
     }
     return 'student';
   }
-  async function createUser({ email, fullName, password, googleSub, picture, level }) {
+  async function createUser({ email, fullName, password, googleSub, picture, level, groupId }) {
     const id = uid();
     const role = await roleForNewUser(email);
     const user = {
       id, email, role, fullName, displayName: fullName.split(' ')[0] || fullName,
       avatar: { emoji: '🦊', color: '#7b6cff', frame: 'ring' }, bio: '', goal: '',
       created: now(), googleSub: googleSub || null, picture: picture || null,
-      level: level || 'A1', levelSet: !!level,
+      level: level || 'A1', levelSet: !!level, groupId: groupId || null, groupSet: !!groupId,
     };
     if (password) Object.assign(user, hashPassword(password));
     await db.setJSON('users', id, user);
@@ -123,12 +131,26 @@ export function createApp(db, env = () => undefined) {
   const clearFailures = (email) => db.del('attempts', emailKey(email));
   const goodPassword = (pw) => String(pw || '').length >= 8 && String(pw).length <= 200;
 
+  async function getGroups() {
+    const g = await db.getJSON('config', 'groups');
+    return g && Array.isArray(g.groups) && g.groups.length ? g.groups : DEFAULT_GROUPS;
+  }
+  async function getSettings() { return { ...DEFAULT_SETTINGS, ...((await db.getJSON('config', 'settings')) || {}) }; }
+  // Sign-up is allowed unless the teacher closed it. The very first account and the TEACHER_EMAIL account always can.
+  async function signupAllowed(email) {
+    const st = await getSettings();
+    if (st.signupOpen) return true;
+    const teacherEmail = (env('TEACHER_EMAIL') || '').toLowerCase().trim();
+    if (teacherEmail && teacherEmail === email) return true;
+    return (await db.keys('users')).length === 0;
+  }
+
   async function lessonAccess(lesson, user) {
     if (lesson.access !== 'private') return true;
     if (!user) return false;
     if (user.role === 'teacher') return true;
     const grant = (await db.getJSON('access', lesson.id)) || { all: false, users: [] };
-    return grant.all || grant.users.includes(user.id);
+    return grant.all || grant.users.includes(user.id) || (!!user.groupId && (grant.groups || []).includes(user.groupId));
   }
 
   async function allOf(store) {
@@ -145,8 +167,10 @@ export function createApp(db, env = () => undefined) {
     routes.push({ method, re, keys, handler });
   };
 
-  route('GET', '/api/config', async () =>
-    json({ googleClientId: env('GOOGLE_CLIENT_ID') || null, backend: true }));
+  route('GET', '/api/config', async () => {
+    const st = await getSettings();
+    return json({ googleClientId: env('GOOGLE_CLIENT_ID') || null, backend: true, groups: await getGroups(), askGroup: !!st.askGroup, signupOpen: !!st.signupOpen, welcome: st.welcome || '' });
+  });
 
   route('POST', '/api/auth/register', async (req) => {
     const b = await req.json().catch(() => ({}));
@@ -157,7 +181,9 @@ export function createApp(db, env = () => undefined) {
     if (fullName.length < 2) return fail(400, 'Enter your name.');
     if (password.length < 8) return fail(400, 'Use a password with at least 8 characters.');
     if (await db.getJSON('emails', email)) return fail(409, 'An account with this email already exists. Try logging in.');
-    const user = await createUser({ email, fullName, password, level: pickLevel(b.level) });
+    if (!(await signupAllowed(email))) return fail(403, 'Sign-up is closed right now. Ask your teacher to open it or to make an account for you.');
+    const group = (await getGroups()).find((g) => g.id === b.groupId);
+    const user = await createUser({ email, fullName, password, level: pickLevel(b.level) || (group && pickLevel(group.level)), groupId: group ? group.id : null });
     return json(await startSession(user), 201);
   });
 
@@ -198,6 +224,7 @@ export function createApp(db, env = () => undefined) {
         await db.setJSON('users', user.id, user);
         await db.setJSON('google', info.sub, { id: user.id });
       } else {
+        if (!(await signupAllowed(email))) return fail(403, 'Sign-up is closed right now. Ask your teacher to open it.');
         user = await createUser({ email, fullName: clean(info.name || email.split('@')[0], 60), googleSub: info.sub, picture: info.picture });
       }
     }
@@ -218,6 +245,19 @@ export function createApp(db, env = () => undefined) {
     if (!level) return fail(400, 'Choose one of the levels.');
     if (u.levelSet && u.role !== 'teacher') return fail(403, 'Your level is set. Ask your teacher to change it.');
     u.level = level; u.levelSet = true;
+    await db.setJSON('users', u.id, u);
+    return json({ user: publicUser(u) });
+  });
+
+  route('POST', '/api/me/group', async (req) => {
+    const u = await authUser(req);
+    if (!u) return fail(401, 'Please log in.');
+    const b = await req.json().catch(() => ({}));
+    const group = (await getGroups()).find((g) => g.id === b.groupId);
+    if (!group) return fail(400, 'Choose one of the groups.');
+    if (u.groupSet && u.role !== 'teacher' && !(await getSettings()).studentsChangeGroup) return fail(403, 'Your group is set. Ask your teacher to change it.');
+    u.groupId = group.id; u.groupSet = true;
+    if (!u.levelSet && pickLevel(group.level)) { u.level = pickLevel(group.level); u.levelSet = true; }
     await db.setJSON('users', u.id, u);
     return json({ user: publicUser(u) });
   });
@@ -327,7 +367,7 @@ export function createApp(db, env = () => undefined) {
 
   async function homeworkFor(user) {
     const all = (await allOf('homework')).sort((a, b) => b.created - a.created);
-    const mine = all.filter((h) => h.to === 'all' || (Array.isArray(h.to) && h.to.includes(user.id)));
+    const mine = all.filter((h) => h.to === 'all' || (Array.isArray(h.to) && h.to.includes(user.id)) || (user.groupId && (h.groups || []).includes(user.groupId)));
     const out = [];
     for (const h of mine) {
       const done = await db.getJSON('hwdone', `${h.id}-${user.id}`);
@@ -352,30 +392,107 @@ export function createApp(db, env = () => undefined) {
   // ----- teacher -----
   route('GET', '/api/admin/overview', async (req) => {
     if (!(await requireTeacher(req))) return fail(403, 'Teacher access only.');
-    const students = (await allOf('users')).map((u) => ({ id: u.id, email: u.email, displayName: u.displayName, fullName: u.fullName, role: u.role, created: u.created, avatar: u.avatar, level: u.level || 'A1', levelSet: !!u.levelSet }));
+    const students = (await allOf('users')).map((u) => ({ id: u.id, email: u.email, displayName: u.displayName, fullName: u.fullName, role: u.role, created: u.created, avatar: u.avatar, level: u.level || 'A1', levelSet: !!u.levelSet, groupId: u.groupId || null, note: u.note || '', google: !!u.googleSub }));
     for (const s of students) {
       const pr = await db.getJSON('progress', s.id);
       const d = pr && pr.data;
       Object.assign(s, { xp: d?.xp || 0, streak: d?.streak?.count || 0, words: d?.words ? Object.keys(d.words).length : 0, active: pr?.updated || null });
     }
     const access = {};
-    for (const l of await allOf('lessons')) access[l.id] = (await db.getJSON('access', l.id)) || { all: false, users: [] };
+    for (const l of await allOf('lessons')) access[l.id] = (await db.getJSON('access', l.id)) || { all: false, users: [], groups: [] };
     const requests = await allOf('requests');
     const homework = (await allOf('homework')).sort((a, b) => b.created - a.created);
     const hwdoneKeys = await db.keys('hwdone');
     for (const h of homework) h.doneCount = hwdoneKeys.filter((k) => k.startsWith(h.id + '-')).length;
-    return json({ students, access, requests, homework });
+    return json({ students, access, requests, homework, groups: await getGroups(), settings: await getSettings() });
   });
 
+  // The teacher edits any student: name, email, group, level, private note.
   route('PUT', '/api/admin/student', async (req) => {
     if (!(await requireTeacher(req))) return fail(403, 'Teacher access only.');
     const b = await req.json().catch(() => ({}));
-    const level = pickLevel(b.level);
     const u = await db.getJSON('users', clean(b.userId, 40));
-    if (!u || !level) return fail(400, 'Choose a student and a level.');
-    u.level = level; u.levelSet = true;
+    if (!u) return fail(404, 'Student not found.');
+    if (b.level !== undefined) {
+      const level = pickLevel(b.level);
+      if (!level) return fail(400, 'Choose a level.');
+      u.level = level; u.levelSet = true;
+    }
+    if (b.groupId !== undefined) {
+      if (b.groupId === '' || b.groupId === null) { u.groupId = null; u.groupSet = false; }
+      else {
+        const g = (await getGroups()).find((x) => x.id === b.groupId);
+        if (!g) return fail(400, 'That group does not exist.');
+        u.groupId = g.id; u.groupSet = true;
+      }
+    }
+    if (b.fullName !== undefined) { const n = clean(b.fullName, 60); if (n.length < 2) return fail(400, 'Enter the name.'); u.fullName = n; }
+    if (b.displayName !== undefined) u.displayName = clean(b.displayName, 32) || u.displayName;
+    if (b.note !== undefined) u.note = clean(b.note, 300);
+    if (b.email !== undefined) {
+      const email = clean(b.email, 120).toLowerCase();
+      if (email !== u.email) {
+        if (!EMAIL.test(email)) return fail(400, 'Enter a valid email address.');
+        if (await db.getJSON('emails', email)) return fail(409, 'Another account already uses this email.');
+        await db.del('emails', u.email);
+        await db.setJSON('emails', email, { id: u.id });
+        u.email = email;
+      }
+    }
     await db.setJSON('users', u.id, u);
-    return json({ ok: true, level });
+    return json({ ok: true, student: { id: u.id, email: u.email, displayName: u.displayName, fullName: u.fullName, level: u.level || 'A1', groupId: u.groupId || null, note: u.note || '' } });
+  });
+
+  route('DELETE', '/api/admin/student/:id', async (req, p) => {
+    const me = await requireTeacher(req);
+    if (!me) return fail(403, 'Teacher access only.');
+    const u = await db.getJSON('users', p.id);
+    if (!u) return fail(404, 'Student not found.');
+    if (u.role === 'teacher') return fail(400, 'A teacher account cannot be removed here.');
+    await db.del('users', u.id);
+    await db.del('emails', u.email);
+    if (u.googleSub) await db.del('google', u.googleSub);
+    await db.del('progress', u.id);
+    await clearFailures(u.email);
+    return json({ ok: true });
+  });
+
+  route('PUT', '/api/admin/groups', async (req) => {
+    if (!(await requireTeacher(req))) return fail(403, 'Teacher access only.');
+    const b = await req.json().catch(() => ({}));
+    if (!Array.isArray(b.groups) || !b.groups.length) return fail(400, 'Keep at least one group.');
+    const before = await getGroups();
+    const used = new Set();
+    const groups = b.groups.slice(0, 30).map((g) => {
+      const name = clean(g.name, 40);
+      let id = before.find((x) => x.id === g.id) ? g.id : (name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 24) || 'group') + '-' + uid().slice(0, 4);
+      while (used.has(id)) id += 'x';
+      used.add(id);
+      return { id, name, level: pickLevel(g.level) || '' };
+    });
+    if (groups.some((g) => !g.name)) return fail(400, 'Every group needs a name.');
+    await db.setJSON('config', 'groups', { groups });
+    const gone = new Set(before.filter((g) => !used.has(g.id)).map((g) => g.id));
+    if (gone.size) {
+      for (const u of await allOf('users')) if (u.groupId && gone.has(u.groupId)) { u.groupId = null; u.groupSet = false; await db.setJSON('users', u.id, u); }
+    }
+    return json({ groups });
+  });
+
+  route('PUT', '/api/admin/settings', async (req) => {
+    if (!(await requireTeacher(req))) return fail(403, 'Teacher access only.');
+    const b = await req.json().catch(() => ({}));
+    const cur = await getSettings();
+    const next = {
+      signupOpen: b.signupOpen === undefined ? cur.signupOpen : !!b.signupOpen,
+      askGroup: b.askGroup === undefined ? cur.askGroup : !!b.askGroup,
+      studentsChangeGroup: b.studentsChangeGroup === undefined ? cur.studentsChangeGroup : !!b.studentsChangeGroup,
+      newLessonAccess: b.newLessonAccess === 'open' ? 'open' : b.newLessonAccess === 'private' ? 'private' : cur.newLessonAccess,
+      hwDefaultDays: Number.isFinite(+b.hwDefaultDays) ? Math.min(60, Math.max(0, Math.round(+b.hwDefaultDays))) : cur.hwDefaultDays,
+      welcome: b.welcome === undefined ? cur.welcome : clean(b.welcome, 240),
+    };
+    await db.setJSON('config', 'settings', next);
+    return json({ settings: next });
   });
 
   route('POST', '/api/admin/student/password', async (req) => {
@@ -504,8 +621,12 @@ export function createApp(db, env = () => undefined) {
     const lessonId = clean(b.lessonId, 40);
     if (!(await db.getJSON('lessons', lessonId))) return fail(404, 'Lesson not found.');
     const grant = (await db.getJSON('access', lessonId)) || { all: false, users: [] };
+    grant.groups = grant.groups || [];
     if (b.userId === 'all') grant.all = !!b.grant;
-    else {
+    else if (String(b.userId).startsWith('group:')) {
+      const gid = String(b.userId).slice(6);
+      grant.groups = b.grant ? [...new Set([...grant.groups, gid])] : grant.groups.filter((x) => x !== gid);
+    } else {
       const set = new Set(grant.users);
       b.grant ? set.add(b.userId) : set.delete(b.userId);
       grant.users = [...set];
@@ -540,7 +661,8 @@ export function createApp(db, env = () => undefined) {
     const hw = {
       id: uid(), title: clean(b.title, 100), body: clean(b.body, 1500), lessonId: clean(b.lessonId, 40) || null,
       due: Number.isFinite(+b.due) && +b.due > 0 ? +b.due : null,
-      to: b.to === 'all' || !Array.isArray(b.to) ? 'all' : b.to.slice(0, 500),
+      groups: Array.isArray(b.groups) ? b.groups.map((g) => clean(g, 60)).slice(0, 30) : [],
+      to: b.to === 'all' || !Array.isArray(b.to) ? (Array.isArray(b.groups) && b.groups.length ? [] : 'all') : b.to.slice(0, 500),
       created: now(),
     };
     if (!hw.title) return fail(400, 'Give the homework a title.');

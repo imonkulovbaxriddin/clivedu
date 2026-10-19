@@ -16,14 +16,14 @@ export async function render(root) {
     return;
   }
   let tab = 'lessons';
-  let ov = { students: [], access: {}, requests: [], homework: [] };
+  let ov = { students: [], access: {}, requests: [], homework: [], groups: [], settings: {} };
   const body = h('div', { class: 'stack' });
   const tabs = h('div', { class: 'seg', role: 'tablist', style: { marginBottom: '18px' } });
-  const reloadOv = async () => { try { ov = await api.get('/api/admin/overview'); } catch (e) { toast(e.message, 'bad'); } };
+  const reloadOv = async () => { try { ov = await api.get('/api/admin/overview'); net.groups = ov.groups || net.groups; } catch (e) { toast(e.message, 'bad'); } };
   const refresh = async () => { await reloadOv(); await loadContent(); show(); };
   const show = () => {
-    tabs.replaceChildren(...[['lessons', 'Lessons'], ['vocab', 'Vocabulary'], ['students', `Students${ov.requests.length ? ` (${ov.requests.length} asking)` : ''}`], ['homework', 'Homework'], ['site', 'Announcements']].map(([v, l]) => h('button', { role: 'tab', 'aria-pressed': String(tab === v), onclick: async () => { tab = v; show(); await reloadOv(); show(); } }, l)));
-    body.replaceChildren(({ lessons, vocab, students, homework, site }[tab])());
+    tabs.replaceChildren(...[['lessons', 'Lessons'], ['vocab', 'Vocabulary'], ['students', `Students${ov.requests.length ? ` (${ov.requests.length} asking)` : ''}`], ['groups', 'Groups'], ['homework', 'Homework'], ['site', 'Announcements'], ['settings', '⚙ Settings']].map(([v, l]) => h('button', { role: 'tab', 'aria-pressed': String(tab === v), onclick: async () => { tab = v; show(); await reloadOv(); show(); } }, l)));
+    body.replaceChildren(({ lessons, vocab, students, groups, homework, site, settings }[tab])());
   };
 
   // =============== lessons ===============
@@ -52,7 +52,7 @@ export async function render(root) {
   }
 
   function lessonEditor(existing) {
-    const l = existing ? JSON.parse(JSON.stringify(existing)) : { id: '', title: '', emoji: '📘', kind: 'grammar', level: 'A2', summary: '', notes: [], access: 'private', notesOpen: true, published: true, order: (content.lessons.length + 1) * 10 };
+    const l = existing ? JSON.parse(JSON.stringify(existing)) : { id: '', title: '', emoji: '📘', kind: 'grammar', level: 'A2', summary: '', notes: [], access: ov.settings?.newLessonAccess || 'private', notesOpen: true, published: true, order: (content.lessons.length + 1) * 10 };
     modal((sheet, close) => {
       const f = (label, el, hint) => h('div', { class: 'field' }, h('label', label), el, hint ? h('span', { class: 'hint' }, hint) : null);
       const inp = (key, props = {}) => h('input', { value: l[key] ?? '', oninput: (e) => { l[key] = e.target.value; }, ...props });
@@ -197,46 +197,167 @@ export async function render(root) {
 
   // =============== students & access ===============
   let accessLesson = null;
+  const groupName = (id) => (ov.groups || []).find((g) => g.id === id)?.name || '';
+  let studFilter = 'all', studSearch = '';
   function students() {
     const studs = ov.students.filter((u) => u.role !== 'teacher');
     const priv = content.lessons.filter((l) => !content.starter && l.access === 'private');
     if (!accessLesson || !priv.find((l) => l.id === accessLesson)) accessLesson = priv[0]?.id;
-    const grant = ov.access[accessLesson] || { all: false, users: [] };
+    const grant = ov.access[accessLesson] || { all: false, users: [], groups: [] };
     const toggle = async (userId, on) => { try { await api.post('/api/admin/access', { lessonId: accessLesson, userId, grant: on }); await refresh(); } catch (e) { toast(e.message, 'bad'); } };
     const sw = (checked, fn, label) => h('label', { class: 'switch' }, h('input', { type: 'checkbox', checked, 'aria-label': label, onchange: (e) => fn(e.target.checked) }), h('span'));
-    const progressCell = (u) => h('div', { class: 'small' }, `${u.xp || 0} XP`, h('div', { class: 'muted' }, `🔥 ${u.streak || 0} · ⭐ ${u.words || 0} words`, u.active ? ` · ${fmtDate(u.active)}` : ''));
-    const pwBtn = (u) => h('button', { class: 'btn sm', onclick: async () => {
+    const progressCell = (u) => h('div', { class: 'small' }, `${u.xp || 0} XP`, h('div', { class: 'muted' }, `🔥 ${u.streak || 0} · ⭐ ${u.words || 0}`, u.active ? ` · ${fmtDate(u.active)}` : ''));
+    const save = async (u, patch, okMsg) => { try { await api.put('/api/admin/student', { userId: u.id, ...patch }); Object.assign(u, patch); toast(okMsg, 'good'); } catch (ex) { toast(ex.message, 'bad'); } };
+
+    const editStudent = (u) => modal((sheet, close) => {
+      const d = { fullName: u.fullName || '', displayName: u.displayName || '', email: u.email || '', note: u.note || '' };
+      const err = h('p', { class: 'error', role: 'alert' });
+      const f = (label, key, o = {}) => h('div', { class: 'field' }, h('label', label), h('input', { value: d[key], ...o, oninput: (e) => (d[key] = e.target.value) }));
+      sheet.append(h('h2', { class: 'h2' }, `Edit ${u.displayName}`),
+        h('div', { class: 'stack', style: { marginTop: '12px' } },
+          f('Full name', 'fullName', { maxlength: 60 }), f('Name shown in class', 'displayName', { maxlength: 32 }), f('Email', 'email', { type: 'email' }),
+          h('div', { class: 'field' }, h('label', 'Private note (only you see this)'), h('textarea', { maxlength: 300, placeholder: 'e.g. Needs extra speaking practice', oninput: (e) => (d.note = e.target.value) }, d.note)),
+          err,
+          h('div', { class: 'row' }, h('button', { class: 'btn primary', onclick: async () => {
+            err.textContent = '';
+            try { await api.put('/api/admin/student', { userId: u.id, ...d }); Object.assign(u, d); toast('Student updated', 'good'); close(); show(); } catch (ex) { err.textContent = ex.message; }
+          } }, 'Save'), h('button', { class: 'btn', onclick: close }, 'Cancel'))));
+    });
+    const pwBtn = (u) => h('button', { class: 'btn sm', title: 'Set a temporary password', onclick: async () => {
       const pw = prompt(`New temporary password for ${u.displayName} (at least 8 characters). Tell it to the student; they can change it in their profile.`);
       if (!pw) return;
       try { await api.post('/api/admin/student/password', { userId: u.id, password: pw }); toast(`Password changed for ${u.displayName}`, 'good'); } catch (ex) { toast(ex.message, 'bad'); }
-    } }, 'Reset');
+    } }, '🔑');
+    const removeBtn = (u) => h('button', { class: 'btn sm danger', title: 'Remove this student', onclick: async () => {
+      if (!(await confirmBox(`Remove ${u.displayName} (${u.email})? Their account and saved progress are deleted. This cannot be undone.`, 'Remove'))) return;
+      try { await api.del(`/api/admin/student/${u.id}`); toast('Student removed'); refresh(); } catch (ex) { toast(ex.message, 'bad'); }
+    } }, '🗑');
+
+    const shown = studs.filter((u) => (studFilter === 'all' || (studFilter === 'none' ? !u.groupId : u.groupId === studFilter))
+      && (!studSearch || `${u.displayName} ${u.fullName} ${u.email}`.toLowerCase().includes(studSearch.toLowerCase())));
+    const list = h('div', { style: { overflowX: 'auto' } }, shown.length ? h('table', { class: 'table' },
+      h('thead', h('tr', ['Student', 'Group', 'Level', 'Progress', 'Joined', ''].map((x) => h('th', x)))),
+      h('tbody', shown.map((u) => h('tr',
+        h('td', h('div', { class: 'row', style: { flexWrap: 'nowrap' } }, avatarEl(u), h('div', h('b', u.fullName || u.displayName), h('div', { class: 'small muted' }, u.email), u.note ? h('div', { class: 'small', title: u.note }, `📝 ${u.note.slice(0, 40)}${u.note.length > 40 ? '…' : ''}`) : null))),
+        h('td', h('select', { 'aria-label': `Group for ${u.displayName}`, style: { width: 'auto' }, onchange: (e) => save(u, { groupId: e.target.value }, `${u.displayName} moved`) },
+          h('option', { value: '', selected: !u.groupId }, '— none —'), (ov.groups || []).map((g) => h('option', { value: g.id, selected: g.id === u.groupId }, g.name)))),
+        h('td', h('select', { 'aria-label': `Level for ${u.displayName}`, style: { width: 'auto' }, onchange: (e) => save(u, { level: e.target.value }, `${u.displayName} is now ${e.target.value}`) },
+          LEVELS.map((lv) => h('option', { value: lv.id, selected: lv.id === (u.level || 'A1') }, `${lv.id} · ${lv.name}`)))),
+        h('td', progressCell(u)), h('td', fmtDate(u.created)),
+        h('td', h('div', { class: 'row', style: { flexWrap: 'nowrap', gap: '6px' } }, h('button', { class: 'btn sm', title: 'Edit name, email, note', onclick: () => editStudent(u) }, '✏️'), pwBtn(u), removeBtn(u)))))))
+      : h('p', { class: 'muted' }, studs.length ? 'No student matches this filter.' : 'No students have signed up yet. Share your site link with the class.'));
+
     return h('div', { class: 'stack' },
       ov.requests.length ? h('section', { class: 'glass card stack', style: { borderColor: 'var(--gold)' } }, h('h2', { class: 'h2' }, 'Waiting for access'),
-        ov.requests.map((r) => { const u = ov.students.find((x) => x.id === r.userId); const les = content.lessons.find((x) => x.id === r.lessonId); return h('div', { class: 'row between' }, h('span', h('b', u?.displayName || 'A student'), ` asked for “${les?.title || r.lessonId}” · ${fmtDateTime(r.at)}`), h('button', { class: 'btn sm primary', onclick: async () => { await api.post('/api/admin/access', { lessonId: r.lessonId, userId: r.userId, grant: true }); toast('Access granted', 'good'); refresh(); } }, 'Approve')); })) : null,
+        ov.requests.map((r) => { const u = ov.students.find((x) => x.id === r.userId); const les = content.lessons.find((x) => x.id === r.lessonId); return h('div', { class: 'row between' }, h('span', h('b', u?.displayName || 'A student'), ` asked for “${les?.title || r.lessonId}” · ${fmtDateTime(r.at)}`), h('button', { class: 'btn sm primary', onclick: async () => { await api.post('/api/admin/access', { lessonId: r.lessonId, userId: r.userId, grant: true }); refresh(); } }, 'Allow')); })) : null,
+      h('section', { class: 'glass card stack' },
+        h('div', { class: 'row between' }, h('h2', { class: 'h2' }, `Students (${shown.length}${shown.length !== studs.length ? ` of ${studs.length}` : ''})`),
+          h('button', { class: 'btn sm', onclick: () => exportCsv(studs) }, '⬇ Export CSV')),
+        h('p', { class: 'muted' }, 'Change a group or level right in the table. ✏️ edits the name, email and a private note, 🔑 sets a temporary password, 🗑 removes the student.'),
+        h('div', { class: 'row' },
+          h('select', { 'aria-label': 'Filter by group', style: { width: 'auto' }, onchange: (e) => { studFilter = e.target.value; show(); } },
+            h('option', { value: 'all', selected: studFilter === 'all' }, 'All groups'), (ov.groups || []).map((g) => h('option', { value: g.id, selected: studFilter === g.id }, `${g.name} (${studs.filter((u) => u.groupId === g.id).length})`)),
+            h('option', { value: 'none', selected: studFilter === 'none' }, `No group (${studs.filter((u) => !u.groupId).length})`)),
+          h('input', { class: 'grow', type: 'search', placeholder: 'Search by name or email', value: studSearch, 'aria-label': 'Search students', oninput: (e) => { studSearch = e.target.value; clearTimeout(studTimer); studTimer = setTimeout(() => { show(); document.querySelector('[aria-label="Search students"]')?.focus(); }, 350); } })),
+        list),
       h('section', { class: 'glass card stack' }, h('h2', { class: 'h2' }, 'Who can open which slides'),
         priv.length ? h('div', { class: 'stack' },
           h('div', { class: 'field' }, h('label', { for: 'acl' }, 'Lesson'), h('select', { id: 'acl', onchange: (e) => { accessLesson = e.target.value; show(); } }, priv.map((l) => h('option', { value: l.id, selected: l.id === accessLesson }, `${l.emoji} ${l.title}`)))),
           h('div', { class: 'setting' }, h('div', h('b', 'Everyone (all students)'), h('span', { class: 'hint' }, 'Turn on to unlock for the whole class, including future students.')), sw(grant.all, (v) => toggle('all', v), 'Unlock for everyone')),
-          studs.length ? h('table', { class: 'table' }, h('thead', h('tr', h('th', 'Student'), h('th', 'Joined'), h('th', 'Access'))), h('tbody', studs.map((u) => h('tr', h('td', h('div', { class: 'row', style: { flexWrap: 'nowrap' } }, avatarEl(u), h('div', h('b', u.displayName), h('div', { class: 'small muted' }, u.email)))), h('td', fmtDate(u.created)), h('td', sw(grant.all || grant.users.includes(u.id), (v) => toggle(u.id, v), `Access for ${u.displayName}`)))))) : h('p', { class: 'muted' }, 'No students have signed up yet. Share your site link with the class.'))
-          : h('p', { class: 'muted' }, 'You have no locked lessons yet. Create a lesson and keep “Only students I grant” selected.')),
-      h('section', { class: 'glass card stack' }, h('h2', { class: 'h2' }, 'Student levels'),
-        h('p', { class: 'muted' }, 'Students choose a starting level when they sign up. After you place them in your group, set the right level here. They cannot change it themselves.'),
-        studs.length ? h('table', { class: 'table' }, h('thead', h('tr', h('th', 'Student'), h('th', 'Joined'), h('th', 'Level'), h('th', 'Progress'), h('th', 'Password'))),
-          h('tbody', studs.map((u) => h('tr', h('td', h('div', { class: 'row', style: { flexWrap: 'nowrap' } }, avatarEl(u), h('div', h('b', u.displayName), h('div', { class: 'small muted' }, u.email)))), h('td', fmtDate(u.created)),
-            h('td', h('select', { 'aria-label': `Level for ${u.displayName}`, style: { width: 'auto' }, onchange: async (e) => { try { await api.put('/api/admin/student', { userId: u.id, level: e.target.value }); u.level = e.target.value; toast(`${u.displayName} is now ${e.target.value}`, 'good'); } catch (ex) { toast(ex.message, 'bad'); } } },
-              LEVELS.map((lv) => h('option', { value: lv.id, selected: lv.id === (u.level || 'A1') }, `${lv.id} · ${lv.name}`)))), h('td', progressCell(u)), h('td', pwBtn(u))))))
-          : h('p', { class: 'muted' }, 'No students have signed up yet. Share your site link with the class.')));
+          ...(ov.groups || []).map((g) => h('div', { class: 'setting' }, h('div', h('b', `Group: ${g.name}`), h('span', { class: 'hint' }, 'Everyone in this group, including students who join it later.')), sw(grant.all || (grant.groups || []).includes(g.id), (v) => toggle('group:' + g.id, v), `Unlock for ${g.name}`))),
+          studs.length ? h('table', { class: 'table' }, h('thead', h('tr', h('th', 'Student'), h('th', 'Group'), h('th', 'Access'))), h('tbody', studs.map((u) => h('tr', h('td', h('b', u.displayName), h('div', { class: 'small muted' }, u.email)), h('td', groupName(u.groupId) || '—'), h('td', sw(grant.all || grant.users.includes(u.id) || (grant.groups || []).includes(u.groupId), (v) => toggle(u.id, v), `Access for ${u.displayName}`))))))
+          : null)
+          : h('p', { class: 'muted' }, 'You have no locked lessons yet. Create a lesson and keep “Only students I grant” selected.')));
+  }
+  let studTimer = null;
+  const csvCell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  function download(name, text, type) {
+    const a = h('a', { href: URL.createObjectURL(new Blob([text], { type })), download: name }); document.body.append(a); a.click(); a.remove();
+  }
+  function exportCsv(studs) {
+    const rows = [['Name', 'Display name', 'Email', 'Group', 'Level', 'XP', 'Streak', 'Words', 'Joined', 'Note'], ...studs.map((u) => [u.fullName, u.displayName, u.email, groupName(u.groupId), u.level, u.xp || 0, u.streak || 0, u.words || 0, new Date(u.created).toISOString().slice(0, 10), u.note || ''])];
+    download('clivedu-students.csv', '﻿' + rows.map((r) => r.map(csvCell).join(',')).join('\n'), 'text/csv');
+  }
+
+  // =============== groups ===============
+  let gdraft = null;
+  function groups() {
+    if (!gdraft) gdraft = (ov.groups || []).map((g) => ({ ...g }));
+    const studs = ov.students.filter((u) => u.role !== 'teacher');
+    const err = h('p', { class: 'error', role: 'alert' });
+    return h('div', { class: 'stack' }, h('section', { class: 'glass card stack' },
+      h('h2', { class: 'h2' }, 'Groups'),
+      h('p', { class: 'muted' }, 'Students pick one of these groups when they sign up. Rename them, add more, or remove ones you do not need. The level of a group is what a new student starts with. Removing a group leaves its students without a group.'),
+      h('div', { class: 'stack' }, gdraft.map((g, i) => h('div', { class: 'row', style: { flexWrap: 'wrap' } },
+        h('input', { class: 'grow', value: g.name, maxlength: 40, 'aria-label': `Name of group ${i + 1}`, oninput: (e) => (g.name = e.target.value) }),
+        h('select', { 'aria-label': `Level of ${g.name}`, style: { width: 'auto' }, onchange: (e) => (g.level = e.target.value) }, h('option', { value: '', selected: !g.level }, 'No level'), LEVELS.map((lv) => h('option', { value: lv.id, selected: lv.id === g.level }, `${lv.id} · ${lv.name}`))),
+        h('span', { class: 'chip' }, `${studs.filter((u) => u.groupId === g.id).length} students`),
+        h('button', { class: 'btn sm', 'aria-label': 'Move up', disabled: i === 0, onclick: () => { [gdraft[i - 1], gdraft[i]] = [gdraft[i], gdraft[i - 1]]; show(); } }, '↑'),
+        h('button', { class: 'btn sm danger', 'aria-label': `Remove ${g.name}`, onclick: async () => {
+          const n = studs.filter((u) => u.groupId === g.id).length;
+          if (n && !(await confirmBox(`${n} student${n === 1 ? ' is' : 's are'} in “${g.name}”. They will have no group until you move them. Continue?`, 'Remove'))) return;
+          gdraft.splice(i, 1); show();
+        } }, '🗑')))),
+      err,
+      h('div', { class: 'row' },
+        h('button', { class: 'btn', onclick: () => { gdraft.push({ id: '', name: '', level: '' }); show(); } }, '＋ Add a group'),
+        h('button', { class: 'btn primary', onclick: async () => {
+          err.textContent = '';
+          if (!gdraft.length) { err.textContent = 'Keep at least one group.'; return; }
+          if (gdraft.some((g) => !g.name.trim())) { err.textContent = 'Every group needs a name.'; return; }
+          try { await api.put('/api/admin/groups', { groups: gdraft }); gdraft = null; toast('Groups saved', 'good'); await refresh(); } catch (ex) { err.textContent = ex.message; }
+        } }, 'Save groups'),
+        h('button', { class: 'btn', onclick: () => { gdraft = null; show(); } }, 'Undo changes'))));
+  }
+
+  // =============== teacher settings ===============
+  function settings() {
+    const st = { ...(ov.settings || {}) };
+    const sw = (key, label, hint) => h('div', { class: 'setting' }, h('div', h('b', label), h('span', { class: 'hint' }, hint)), h('label', { class: 'switch' }, h('input', { type: 'checkbox', checked: !!st[key], 'aria-label': label, onchange: (e) => (st[key] = e.target.checked) }), h('span')));
+    const err = h('p', { class: 'error', role: 'alert' });
+    const accessSeg = h('div', { class: 'seg' });
+    const paintAcc = () => accessSeg.replaceChildren(...[['private', '🔒 Only students I grant'], ['open', 'Everyone']].map(([v, l]) => h('button', { type: 'button', 'aria-pressed': String(st.newLessonAccess === v), onclick: () => { st.newLessonAccess = v; paintAcc(); } }, l)));
+    paintAcc();
+    const cur = h('input', { type: 'password', autocomplete: 'current-password' }), nw = h('input', { type: 'password', autocomplete: 'new-password' });
+    const pwErr = h('p', { class: 'error', role: 'alert' });
+    return h('div', { class: 'stack' },
+      h('section', { class: 'glass card stack' }, h('h2', { class: 'h2' }, 'Sign-up and groups'),
+        sw('signupOpen', 'Anyone can create an account', 'Turn off once your class has joined, so strangers cannot sign up.'),
+        sw('askGroup', 'Ask new students which group they are in', 'Shown when they sign up (or the first time they log in).'),
+        sw('studentsChangeGroup', 'Students can change their own group', 'When off, only you can move a student to another group.')),
+      h('section', { class: 'glass card stack' }, h('h2', { class: 'h2' }, 'Defaults for new work'),
+        h('div', { class: 'field' }, h('label', 'A new lesson starts as'), accessSeg),
+        h('div', { class: 'field' }, h('label', { for: 'hwdays' }, 'New homework is due after (days, 0 = no date)'), h('input', { id: 'hwdays', type: 'number', min: 0, max: 60, value: st.hwDefaultDays ?? 3, style: { width: '110px' }, oninput: (e) => (st.hwDefaultDays = +e.target.value) })),
+        h('div', { class: 'field' }, h('label', { for: 'wel' }, 'Welcome message on the login page (optional)'), h('input', { id: 'wel', maxlength: 240, value: st.welcome || '', placeholder: 'e.g. Welcome to Group A! Use your real name.', oninput: (e) => (st.welcome = e.target.value) })),
+        err, h('div', { class: 'row' }, h('button', { class: 'btn primary', onclick: async () => {
+          err.textContent = '';
+          try { const r = await api.put('/api/admin/settings', st); ov.settings = r.settings; toast('Settings saved', 'good'); await loadContent(); } catch (ex) { err.textContent = ex.message; }
+        } }, 'Save settings'))),
+      h('section', { class: 'glass card stack' }, h('h2', { class: 'h2' }, 'Your account'),
+        h('p', { class: 'muted' }, `Signed in as ${getUser().email}.`),
+        h('div', { class: 'field' }, h('label', 'Current password'), cur), h('div', { class: 'field' }, h('label', 'New password (at least 8 characters)'), nw), pwErr,
+        h('div', { class: 'row' }, h('button', { class: 'btn', onclick: async () => {
+          pwErr.textContent = '';
+          try { await api.post('/api/me/password', { current: cur.value, next: nw.value }); cur.value = ''; nw.value = ''; toast('Password changed', 'good'); } catch (ex) { pwErr.textContent = ex.message; }
+        } }, 'Change my password'))),
+      h('section', { class: 'glass card stack' }, h('h2', { class: 'h2' }, 'Your data'),
+        h('p', { class: 'muted' }, 'Keep a copy of the class list or of your lessons and vocabulary. Slide files are not included in the backup, only the text.'),
+        h('div', { class: 'row' },
+          h('button', { class: 'btn', onclick: () => exportCsv(ov.students.filter((u) => u.role !== 'teacher')) }, '⬇ Students (CSV)'),
+          h('button', { class: 'btn', onclick: () => download('clivedu-backup.json', JSON.stringify({ exported: new Date().toISOString(), groups: ov.groups, settings: ov.settings, lessons: content.lessons.map(({ unlocked, ...l }) => l), vocab: content.vocab }, null, 2), 'application/json') }, '⬇ Lessons and vocabulary (JSON)'))));
   }
 
   // =============== homework ===============
   function homework() {
     const studs = ov.students.filter((u) => u.role !== 'teacher');
-    const form = { title: '', body: '', lessonId: '', due: '', to: 'all', picked: new Set() };
+    const defDays = Number(ov.settings?.hwDefaultDays ?? 3);
+    const dueDefault = defDays > 0 ? new Date(Date.now() + defDays * 864e5 - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10) : '';
+    const form = { title: '', body: '', lessonId: '', due: dueDefault, to: 'all', picked: new Set(), groupsPicked: new Set() };
     const err = h('p', { class: 'error', role: 'alert' });
     const pickBox = h('div', { class: 'chips' });
-    const paintPick = () => pickBox.replaceChildren(...(form.to === 'all' ? [] : studs.map((u) => h('button', { type: 'button', class: `chip${form.picked.has(u.id) ? ' on' : ''}`, onclick: () => { form.picked.has(u.id) ? form.picked.delete(u.id) : form.picked.add(u.id); paintPick(); } }, u.displayName))));
+    const paintPick = () => pickBox.replaceChildren(...(form.to === 'all' ? [] : form.to === 'groups' ? (ov.groups || []).map((g) => h('button', { type: 'button', class: `chip${form.groupsPicked.has(g.id) ? ' on' : ''}`, onclick: () => { form.groupsPicked.has(g.id) ? form.groupsPicked.delete(g.id) : form.groupsPicked.add(g.id); paintPick(); } }, `${g.name} (${studs.filter((u) => u.groupId === g.id).length})`)) : studs.map((u) => h('button', { type: 'button', class: `chip${form.picked.has(u.id) ? ' on' : ''}`, onclick: () => { form.picked.has(u.id) ? form.picked.delete(u.id) : form.picked.add(u.id); paintPick(); } }, u.displayName))));
     const toSeg = h('div', { class: 'seg' });
-    const paintTo = () => toSeg.replaceChildren(...[['all', 'Whole class'], ['some', 'Chosen students']].map(([v, l]) => h('button', { type: 'button', 'aria-pressed': String(form.to === v), onclick: () => { form.to = v; paintTo(); paintPick(); } }, l)));
+    const paintTo = () => toSeg.replaceChildren(...[['all', 'Whole class'], ['groups', 'Groups'], ['some', 'Chosen students']].map(([v, l]) => h('button', { type: 'button', 'aria-pressed': String(form.to === v), onclick: () => { form.to = v; paintTo(); paintPick(); } }, l)));
     paintTo();
     return h('div', { class: 'stack' },
       h('section', { class: 'glass card stack' }, h('h2', { class: 'h2' }, 'Give homework'),
@@ -244,17 +365,18 @@ export async function render(root) {
         h('div', { class: 'field' }, h('label', { for: 'hwb' }, 'Instructions'), h('textarea', { id: 'hwb', placeholder: 'What should students do and how will you check it?', oninput: (e) => (form.body = e.target.value) })),
         h('div', { class: 'row' },
           h('div', { class: 'field grow' }, h('label', { for: 'hwl' }, 'Related lesson (optional)'), h('select', { id: 'hwl', onchange: (e) => (form.lessonId = e.target.value) }, h('option', { value: '' }, 'None'), content.lessons.map((l) => h('option', { value: l.id }, l.title)))),
-          h('div', { class: 'field' }, h('label', { for: 'hwd' }, 'Due date'), h('input', { id: 'hwd', type: 'date', onchange: (e) => (form.due = e.target.value) }))),
+          h('div', { class: 'field' }, h('label', { for: 'hwd' }, 'Due date'), h('input', { id: 'hwd', type: 'date', value: dueDefault, onchange: (e) => (form.due = e.target.value) }))),
         h('div', { class: 'field' }, h('label', 'Give it to'), toSeg, pickBox),
         err,
         h('div', { class: 'row' }, h('button', { class: 'btn primary', onclick: async () => {
           err.textContent = '';
           if (form.to === 'some' && !form.picked.size) { err.textContent = 'Choose at least one student.'; return; }
-          try { await api.post('/api/admin/homework', { title: form.title, body: form.body, lessonId: form.lessonId, due: form.due ? new Date(form.due + 'T23:59:00').getTime() : null, to: form.to === 'all' ? 'all' : [...form.picked] }); toast('Homework sent. Students are notified.', 'good'); refresh(); } catch (e) { err.textContent = e.message; }
+          if (form.to === 'groups' && !form.groupsPicked.size) { err.textContent = 'Choose at least one group.'; return; }
+          try { await api.post('/api/admin/homework', { title: form.title, body: form.body, lessonId: form.lessonId, due: form.due ? new Date(form.due + 'T23:59:00').getTime() : null, to: form.to === 'some' ? [...form.picked] : form.to === 'groups' ? [] : 'all', groups: form.to === 'groups' ? [...form.groupsPicked] : [] }); toast('Homework sent. Students are notified.', 'good'); refresh(); } catch (e) { err.textContent = e.message; }
         } }, 'Send homework'))),
       h('section', { class: 'stack' }, h('h2', { class: 'h2' }, 'Given so far'),
         ov.homework.length ? ov.homework.map((x) => h('article', { class: 'hw glass' }, h('div', { class: 'row between' }, h('b', x.title), h('button', { class: 'btn sm danger', onclick: async () => { if (await confirmBox(`Delete “${x.title}”?`, 'Delete')) { await api.del(`/api/admin/homework/${x.id}`); refresh(); } } }, 'Delete')),
-          h('div', { class: 'small muted' }, `${fmtDate(x.created)} · ${x.to === 'all' ? 'whole class' : `${x.to.length} student${x.to.length === 1 ? '' : 's'}`} · ${x.doneCount} marked done${x.due ? ` · due ${fmtDate(x.due)}` : ''}`)))
+          h('div', { class: 'small muted' }, `${fmtDate(x.created)} · ${x.to === 'all' ? 'whole class' : [...(x.groups || []).map(groupName), x.to.length ? `${x.to.length} student${x.to.length === 1 ? '' : 's'}` : ''].filter(Boolean).join(' + ')} · ${x.doneCount} marked done${x.due ? ` · due ${fmtDate(x.due)}` : ''}`)))
           : h('p', { class: 'muted' }, 'Nothing yet.')));
   }
 

@@ -23,7 +23,7 @@ export function render(root, _p, query) {
         h('h1', { class: 'h1' }, u ? u.displayName : 'Guest learner'),
         u?.bio ? h('p', { class: 'lede' }, u.bio) : h('p', { class: 'muted' }, u ? 'Add a short bio in Customize.' : 'Log in to pick a name and customise your profile.'),
         h('div', { class: 'row' },
-          u ? h('span', { class: 'chip on', title: t('Your English level. Your teacher sets it.') }, `🎓 ${u.level || 'A1'}`) : null, h('span', { class: 'chip' }, `${t('Level')} ${lv.lv}`), h('span', { class: 'chip' }, `${d.xp} XP`), h('span', { class: 'chip' }, `🔥 ${d.streak.count} ${t('day streak')}`),
+          u ? h('span', { class: 'chip on', title: t('Your English level. Your teacher sets it.') }, `🎓 ${(net.groups.find((g) => g.id === u.groupId) || {}).name || u.level || 'A1'} · ${u.level || 'A1'}`) : null, h('span', { class: 'chip' }, `${t('Level')} ${lv.lv}`), h('span', { class: 'chip' }, `${d.xp} XP`), h('span', { class: 'chip' }, `🔥 ${d.streak.count} ${t('day streak')}`),
           u?.goal ? h('span', { class: 'chip' }, `🎯 ${u.goal}`) : null),
         h('div', { class: 'timer', style: { marginTop: '8px', maxWidth: '340px' }, role: 'progressbar', 'aria-valuenow': lv.pct, 'aria-label': 'Progress to next level' }, h('i', { style: { transform: `scaleX(${lv.pct / 100})` } })),
         h('span', { class: 'small muted' }, `${lv.need - lv.into} XP ${t('to level')} ${lv.lv + 1}`)),

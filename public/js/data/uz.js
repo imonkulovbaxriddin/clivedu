@@ -91,4 +91,9 @@ export const UZ = {
   'Password': 'Parol', 'Change password': 'Parolni o‘zgartirish', 'Password changed': 'Parol o‘zgartirildi',
   'Current password (leave empty if you signed in with Google)': 'Hozirgi parol (Google bilan kirgan bo‘lsangiz, bo‘sh qoldiring)',
   'New password (at least 8 characters)': 'Yangi parol (kamida 8 ta belgi)',
+  'Which group are you in?': 'Qaysi guruhdansiz?', 'Choose the group your teacher put you in.': 'O‘qituvchingiz sizni qo‘ygan guruhni tanlang.',
+  'Please choose a group.': 'Iltimos, guruhni tanlang.', 'Please choose your group below.': 'Iltimos, quyida guruhingizni tanlang.',
+  'Your group': 'Guruhingiz', 'Saved': 'Saqlandi', 'Save': 'Saqlash',
+  'Not sure which group? Ask your teacher. They can move you later.': 'Qaysi guruh ekanini bilmasangiz, o‘qituvchingizdan so‘rang. U keyin ko‘chirib qo‘yishi mumkin.',
+  'Sign-up is closed right now. Ask your teacher.': 'Hozir ro‘yxatdan o‘tish yopiq. O‘qituvchingizdan so‘rang.',
 };

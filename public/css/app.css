@@ -421,3 +421,12 @@ a[href*="netlify.com"]:not(#view a), [id*="netlify" i], [class*="netlify" i], .g
 @keyframes orb-label-out { 0%, 70% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
 .orb-label { animation: orb-label-out 3.2s forwards; }
 #dial:hover .orb-label, #dial:focus-within .orb-label { animation: none; opacity: 1; visibility: visible; }
+
+/* Long names: wrap neatly or end with an ellipsis instead of stretching the layout */
+.name-fit { max-width: 100%; overflow-wrap: break-word; line-height: 1.12; text-wrap: balance; }
+.nm { max-width: 170px; min-width: 0; overflow: hidden; }
+.nm b, .nm > div { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nm > span.small { display: inline; }
+.profile-top .grow { min-width: 0; }
+
+.table td .small { white-space: nowrap; }

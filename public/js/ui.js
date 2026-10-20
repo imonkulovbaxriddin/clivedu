@@ -153,6 +153,11 @@ export function confetti(count = 140) {
 
 export const fmtDate = (ts) => new Date(ts).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 export const fmtDateTime = (ts) => new Date(ts).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+// A long name gets a smaller type size so it fits on one or two tidy lines.
+export function nameScale(name) {
+  const n = String(name || '').length;
+  return n > 26 ? 'clamp(.88rem, 4.4vw, 1.05rem)' : n > 20 ? 'clamp(1.1rem, 5.5vw, 1.4rem)' : n > 14 ? 'clamp(1.3rem, 6.5vw, 1.9rem)' : '';
+}
 export function avatarEl(user, { large = false } = {}) {
   const a = user?.avatar || { emoji: '🦊', color: '#7b6cff', frame: 'ring' };
   const el = h('span', { class: `avatar${large ? ' lg' : ''}`, 'data-frame': a.frame, style: { background: `linear-gradient(145deg, ${a.color}, color-mix(in oklab, ${a.color} 55%, #000))`, color: a.color }, 'aria-hidden': 'true' });

@@ -56,7 +56,12 @@ export function drawCard(canvas, s) {
   ctx.lineWidth = 6; ctx.strokeStyle = '#ffffff55'; ctx.stroke();
   ctx.font = '96px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(s.e, 160, 196);
   ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#f1eeff';
-  ctx.font = '800 76px "Bricolage Grotesque", system-ui, sans-serif'; ctx.fillText(s.n.slice(0, 16), 280, 190);
+  let nameSize = 76, nameText = String(s.n || '');
+  const setNameFont = () => { ctx.font = `800 ${nameSize}px "Bricolage Grotesque", system-ui, sans-serif`; };
+  setNameFont();
+  while (ctx.measureText(nameText).width > 720 && nameSize > 40) { nameSize -= 4; setNameFont(); }   // shrink a long name to fit
+  while (ctx.measureText(nameText).width > 720 && nameText.length > 3) nameText = nameText.slice(0, -2);
+  ctx.fillText(nameText === s.n ? nameText : nameText.trimEnd() + '…', 280, 190);
   ctx.font = '500 34px system-ui, sans-serif'; ctx.fillStyle = '#a7a1cf'; ctx.fillText(`Level ${s.l} · ${s.x} XP`, 282, 240);
   // headline numbers
   const stat = (x, big, small) => { ctx.fillStyle = '#f1eeff'; ctx.font = '800 108px "Bricolage Grotesque", system-ui, sans-serif'; ctx.fillText(String(big), x, 470); ctx.fillStyle = '#a7a1cf'; ctx.font = '500 30px system-ui, sans-serif'; ctx.fillText(small, x, 512); };

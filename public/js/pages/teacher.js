@@ -238,7 +238,7 @@ export async function render(root) {
     const list = h('div', { style: { overflowX: 'auto' } }, shown.length ? h('table', { class: 'table' },
       h('thead', h('tr', ['Student', 'Group', 'Level', 'Progress', 'Joined', ''].map((x) => h('th', x)))),
       h('tbody', shown.map((u) => h('tr',
-        h('td', h('div', { class: 'row', style: { flexWrap: 'nowrap' } }, avatarEl(u), h('div', h('b', u.fullName || u.displayName), h('div', { class: 'small muted' }, u.email), u.note ? h('div', { class: 'small', title: u.note }, `📝 ${u.note.slice(0, 40)}${u.note.length > 40 ? '…' : ''}`) : null))),
+        h('td', h('div', { class: 'row', style: { flexWrap: 'nowrap' } }, avatarEl(u), h('div', { class: 'nm' }, h('b', u.fullName || u.displayName), h('div', { class: 'small muted' }, u.email), u.note ? h('div', { class: 'small', title: u.note }, `📝 ${u.note.slice(0, 40)}${u.note.length > 40 ? '…' : ''}`) : null))),
         h('td', h('select', { 'aria-label': `Group for ${u.displayName}`, style: { width: 'auto' }, onchange: (e) => save(u, { groupId: e.target.value }, `${u.displayName} moved`) },
           h('option', { value: '', selected: !u.groupId }, '— none —'), (ov.groups || []).map((g) => h('option', { value: g.id, selected: g.id === u.groupId }, g.name)))),
         h('td', h('select', { 'aria-label': `Level for ${u.displayName}`, style: { width: 'auto' }, onchange: (e) => save(u, { level: e.target.value }, `${u.displayName} is now ${e.target.value}`) },
@@ -265,7 +265,7 @@ export async function render(root) {
           h('div', { class: 'field' }, h('label', { for: 'acl' }, 'Lesson'), h('select', { id: 'acl', onchange: (e) => { accessLesson = e.target.value; show(); } }, priv.map((l) => h('option', { value: l.id, selected: l.id === accessLesson }, `${l.emoji} ${l.title}`)))),
           h('div', { class: 'setting' }, h('div', h('b', 'Everyone (all students)'), h('span', { class: 'hint' }, 'Turn on to unlock for the whole class, including future students.')), sw(grant.all, (v) => toggle('all', v), 'Unlock for everyone')),
           ...(ov.groups || []).map((g) => h('div', { class: 'setting' }, h('div', h('b', `Group: ${g.name}`), h('span', { class: 'hint' }, 'Everyone in this group, including students who join it later.')), sw(grant.all || (grant.groups || []).includes(g.id), (v) => toggle('group:' + g.id, v), `Unlock for ${g.name}`))),
-          studs.length ? h('table', { class: 'table' }, h('thead', h('tr', h('th', 'Student'), h('th', 'Group'), h('th', 'Access'))), h('tbody', studs.map((u) => h('tr', h('td', h('b', u.displayName), h('div', { class: 'small muted' }, u.email)), h('td', groupName(u.groupId) || '—'), h('td', sw(grant.all || grant.users.includes(u.id) || (grant.groups || []).includes(u.groupId), (v) => toggle(u.id, v), `Access for ${u.displayName}`))))))
+          studs.length ? h('table', { class: 'table' }, h('thead', h('tr', h('th', 'Student'), h('th', 'Group'), h('th', 'Access'))), h('tbody', studs.map((u) => h('tr', h('td', h('div', { class: 'nm' }, h('b', u.displayName), h('div', { class: 'small muted' }, u.email))), h('td', groupName(u.groupId) || '—'), h('td', sw(grant.all || grant.users.includes(u.id) || (grant.groups || []).includes(u.groupId), (v) => toggle(u.id, v), `Access for ${u.displayName}`))))))
           : null)
           : h('p', { class: 'muted' }, 'You have no locked lessons yet. Create a lesson and keep “Only students I grant” selected.')));
   }
@@ -297,7 +297,7 @@ export async function render(root) {
           rows.length ? h('label', { class: 'row' }, h('input', { type: 'checkbox', checked: free.length > 0 && free.every((u) => picked.has(u.id)), disabled: !free.length, onchange: (e) => { free.forEach((u) => (e.target.checked ? picked.add(u.id) : picked.delete(u.id))); paint(); } }), h('b', 'Select everyone shown')) : h('p', { class: 'muted' }, 'Nobody here yet.'),
           ...rows.map((u) => { const already = has(u) || groupsPicked.has(u.groupId); return h('label', { class: 'row', style: { opacity: already ? .6 : 1 } },
             h('input', { type: 'checkbox', checked: already || picked.has(u.id), disabled: already, onchange: (e) => { e.target.checked ? picked.add(u.id) : picked.delete(u.id); paint(); } }),
-            avatarEl(u), h('span', h('b', u.fullName || u.displayName), h('span', { class: 'small muted' }, ` · ${groupName(u.groupId) || 'no group'}${already ? ' · already has access' : ''}`))); }));
+            avatarEl(u), h('span', { class: 'nm' }, h('b', u.fullName || u.displayName), h('span', { class: 'small muted' }, ` · ${groupName(u.groupId) || 'no group'}${already ? ' · already has access' : ''}`))); }));
         count.textContent = `${picked.size} student${picked.size === 1 ? '' : 's'}${groupsPicked.size ? ` + ${groupsPicked.size} whole group${groupsPicked.size === 1 ? '' : 's'}` : ''} will get the full version`;
       };
       const err = h('p', { class: 'error', role: 'alert' });

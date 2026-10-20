@@ -60,7 +60,7 @@ export function render(root) {
   root.append(
     content.site?.announcement ? h('div', { class: 'glass', style: { padding: '12px 18px', borderRadius: '18px', marginBottom: '14px' } }, '📣 ', content.site.announcement) : null,
     h('section', { class: 'hero' },
-      h('div', { class: 'hello h2' }, h('span', lang, name ? `, ${name}` : ', ' + t('welcome'))),
+      h('div', { class: 'hello h2 name-fit' }, h('span', lang, name ? `, ${name}` : ', ' + t('welcome'))),
       h('h1', { class: 'display', 'aria-label': headline }, glyphs),
       h('p', { class: 'lede' }, user ? t('Pick up where you left off, review the words that are fading, or just wander.') : t('Lessons from your teacher, a galaxy that grows with every word you learn, and games to play together.')),
       h('div', { class: 'row' }, primary, h('a', { class: 'btn', href: '#/words' }, icon('galaxy', 18), t('Open my galaxy')), !user && h('a', { class: 'btn ghost', href: '#/login?signup=1' }, t('Create account'))),

@@ -1,4 +1,4 @@
-import { h, icon, toast, avatarEl, fmtDate } from '../ui.js';
+import { h, icon, toast, avatarEl, fmtDate, nameScale } from '../ui.js';
 import { getUser, D, level, content, allWords, BADGES, updateUser, todayKey, isDue } from '../store.js';
 import { api, net } from '../api.js';
 import { homeworkState, refreshHomework } from '../notify.js';
@@ -20,7 +20,7 @@ export function render(root, _p, query) {
     top.replaceChildren(
       avatarEl(u, { large: true }),
       h('div', { class: 'grow stack', style: { gap: '4px' } },
-        h('h1', { class: 'h1' }, u ? u.displayName : 'Guest learner'),
+        h('h1', { class: 'h1 name-fit', style: { fontSize: nameScale(u?.displayName) } }, u ? u.displayName : 'Guest learner'),
         u?.bio ? h('p', { class: 'lede' }, u.bio) : h('p', { class: 'muted' }, u ? 'Add a short bio in Customize.' : 'Log in to pick a name and customise your profile.'),
         h('div', { class: 'row' },
           u ? h('span', { class: 'chip on', title: t('Your English level. Your teacher sets it.') }, `🎓 ${(net.groups.find((g) => g.id === u.groupId) || {}).name || u.level || 'A1'} · ${u.level || 'A1'}`) : null, h('span', { class: 'chip' }, `${t('Level')} ${lv.lv}`), h('span', { class: 'chip' }, `${d.xp} XP`), h('span', { class: 'chip' }, `🔥 ${d.streak.count} ${t('day streak')}`),

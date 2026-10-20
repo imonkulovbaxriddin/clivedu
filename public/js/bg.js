@@ -50,7 +50,14 @@ let words = [];
 let list = ['hello', 'curious', 'journey', 'brilliant', 'whisper', 'horizon'];
 let W = 0, H = 0, dpr = 1, start = performance.now();
 
-export function setWordList(l) { if (l?.length) { list = l; if (words.length) seedWords(); } }
+// New word lists only change the words that appear next. Re-seeding here made every word jump while the page was loading.
+let introStart = 0;
+export function setWordList(l) {
+  if (!l?.length) return;
+  list = l;
+  // while the background is still fading in, swap the text quietly so the starter words never show
+  if (words.length && (!introStart || performance.now() - introStart < 2500)) for (const w of words) w.text = list[(Math.random() * list.length) | 0];
+}
 
 export function startBackground() {
   canvas = document.getElementById('bg');
@@ -67,7 +74,7 @@ export function startBackground() {
   addEventListener('pointermove', (e) => { pointer.tx = e.clientX / innerWidth; pointer.ty = 1 - e.clientY / innerHeight; pointer.px = e.clientX; pointer.py = e.clientY; }, { passive: true });
   addEventListener('pointerleave', () => { pointer.px = pointer.py = -999; });
   document.addEventListener('visibilitychange', () => (document.hidden ? stop() : go()));
-  on('settings', () => { seedWords(); go(); });
+  on('settings', () => { if (words.length !== wordCount()) seedWords(); go(); });
   go();
 }
 
@@ -93,11 +100,16 @@ function resize() {
   wcanvas.width = W * dpr; wcanvas.height = H * dpr;
   wctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   if (gl) gl.viewport(0, 0, canvas.width, canvas.height);
-  seedWords();
+  // Keep the words where they are when the window changes (phone address bars resize it constantly).
+  if (words.length && oldW && oldH) for (const w of words) { w.x *= W / oldW; w.y *= H / oldH; }
+  if (!words.length || Math.abs(W - oldW) > 200) seedWords();
+  oldW = W; oldH = H;
 }
+let oldW = 0, oldH = 0;
 
+const wordCount = () => (getSettings().motion === 'calm' ? 14 : Math.round(Math.min(46, Math.max(18, (W * H) / 38000))));
 function seedWords() {
-  const n = getSettings().motion === 'calm' ? 14 : Math.round(Math.min(46, Math.max(18, (W * H) / 38000)));
+  const n = wordCount();
   words = Array.from({ length: n }, () => {
     const z = Math.random();
     return {
@@ -119,8 +131,14 @@ function palette() {
   };
 }
 
+let lastNow = 0;
 function frame(now) {
   if (!running) return;
+  if (!introStart) introStart = now;
+  // time-based movement so 90/120 Hz screens are not twice as fast, and a gentle start instead of a rush
+  const k = Math.min(3, lastNow ? (now - lastNow) / 16.67 : 1); lastNow = now;
+  const intro = Math.min(1, (now - introStart) / 3000);
+  const ease = intro * intro * (3 - 2 * intro);
   const reading = document.documentElement.dataset.reading === 'on';
   const calm = getSettings().motion === 'calm' || matchMedia('(prefers-reduced-motion: reduce)').matches;
   pointer.x += (pointer.tx - pointer.x) * .05; pointer.y += (pointer.ty - pointer.y) * .05;
@@ -132,12 +150,12 @@ function frame(now) {
       gl.uniform3fv(U.c1, P.c1); gl.uniform3fv(U.c2, P.c2); gl.uniform3fv(U.c3, P.c3); gl.uniform3fv(U.bg, P.bg); gl.uniform1f(U.light, P.light ? 1 : 0);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     }
-    drawWords(calm);
+    drawWords(calm, k, ease);
   }
   raf = requestAnimationFrame(frame);
 }
 
-function drawWords(calm) {
+function drawWords(calm, k = 1, ease = 1) {
   const ctx = wctx;
   ctx.clearRect(0, 0, W, H);
   const light = effectiveTheme() === 'light';
@@ -147,18 +165,18 @@ function drawWords(calm) {
   const ox = (pointer.x - .5) * -30, oy = (.5 - pointer.y) * -30;
   const near = [];
   for (const w of words) {
-    if (!calm) { w.x += w.vx; w.y += w.vy; }
+    if (!calm) { w.x += w.vx * k * (.2 + .8 * ease); w.y += w.vy * k * (.2 + .8 * ease); }
     if (w.y < -60) { w.y = H + 40; w.x = Math.random() * W; w.text = list[(Math.random() * list.length) | 0]; }
     if (w.x < -200) w.x = W + 100; if (w.x > W + 200) w.x = -100;
     const sx = w.x + ox * w.z, sy = w.y + oy * w.z;
     const d = Math.hypot(sx - mx, sy - my);
     const target = d < 170 ? 1 - d / 170 : 0;
-    w.glow += (target - w.glow) * .1;
+    w.glow += (target - w.glow) * Math.min(1, .1 * k);
     if (w.glow > .25) near.push([sx, sy, w.glow]);
     ctx.save();
     ctx.translate(sx, sy); ctx.rotate(w.rot);
     ctx.font = `${w.glow > .3 ? 700 : 500} ${w.size * (1 + w.glow * .25)}px "Bricolage Grotesque", system-ui, sans-serif`;
-    ctx.globalAlpha = Math.min(1, w.a * (light ? .75 : 1) + w.glow * .7);
+    ctx.globalAlpha = Math.min(1, (w.a * (light ? .75 : 1) + w.glow * .7) * ease);
     ctx.fillStyle = w.glow > .15 ? accent : `rgb(${ink})`;
     if (w.glow > .15) { ctx.shadowColor = accent; ctx.shadowBlur = 18 * w.glow; }
     ctx.fillText(w.text, 0, 0);

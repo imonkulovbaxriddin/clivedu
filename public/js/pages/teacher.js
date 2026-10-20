@@ -86,7 +86,7 @@ export async function render(root) {
           await saveLesson();
           prog.style.display = ''; const setP = (x, t) => { prog.firstChild.style.transform = `scaleX(${x})`; status.textContent = t; };
           await uploadDeck(l.id, file, previews, setP);
-          setP(1, 'Slides uploaded.'); toast('Slides uploaded', 'good'); refresh();
+          setP(1, 'Slides uploaded.'); toast('Slides uploaded', 'good'); await refresh(); askWhoGetsFull(l);
         } catch (ex) { err.textContent = ex.message; status.textContent = ''; }
       } });
 
@@ -99,7 +99,7 @@ export async function render(root) {
           await saveLesson();
           pProg.style.display = '';
           await uploadChunks(l.id, new Uint8Array(await file.arrayBuffer()), { kind: 'pptx', name: file.name }, (x, t) => { pProg.firstChild.style.transform = `scaleX(${x})`; pStatus.textContent = t; });
-          pStatus.textContent = `PowerPoint attached: ${file.name}`; toast('PowerPoint attached', 'good'); refresh();
+          pStatus.textContent = `PowerPoint attached: ${file.name}`; toast('PowerPoint attached', 'good'); await refresh(); askWhoGetsFull(l);
         } catch (ex) { err.textContent = ex.message; pStatus.textContent = ''; }
       } });
       const removeFile = async (kind) => {
@@ -270,6 +270,54 @@ export async function render(root) {
           : h('p', { class: 'muted' }, 'You have no locked lessons yet. Create a lesson and keep “Only students I grant” selected.')));
   }
   let studTimer = null;
+
+  // After a file is added to a locked lesson: pick a group, then choose which students get the full version.
+  async function askWhoGetsFull(lesson) {
+    if (lesson.access !== 'private') return;
+    const studs = ov.students.filter((u) => u.role !== 'teacher');
+    if (!studs.length) { toast('No students yet. Grant access later in the Students tab.'); return; }
+    const grant = ov.access[lesson.id] || { all: false, users: [], groups: [] };
+    const has = (u) => grant.all || grant.users.includes(u.id) || (grant.groups || []).includes(u.groupId);
+    const picked = new Set(), groupsPicked = new Set();
+    let view = 'all';
+    modal((sheet, close) => {
+      const chips = h('div', { class: 'chips' }), listBox = h('div', { class: 'stack', style: { gap: '4px', maxHeight: '45vh', overflowY: 'auto' } }), count = h('span', { class: 'muted small' });
+      const inView = () => studs.filter((u) => view === 'all' || (view === 'none' ? !u.groupId : u.groupId === view));
+      const paint = () => {
+        const groupsList = ov.groups || [];
+        chips.replaceChildren(
+          h('button', { type: 'button', class: `chip${view === 'all' ? ' on' : ''}`, onclick: () => { view = 'all'; paint(); } }, `Everyone (${studs.length})`),
+          ...groupsList.map((g) => h('button', { type: 'button', class: `chip${view === g.id ? ' on' : ''}`, onclick: () => { view = g.id; paint(); } }, `${g.name} (${studs.filter((u) => u.groupId === g.id).length})`)),
+          h('button', { type: 'button', class: `chip${view === 'none' ? ' on' : ''}`, onclick: () => { view = 'none'; paint(); } }, `No group (${studs.filter((u) => !u.groupId).length})`));
+        const rows = inView();
+        const free = rows.filter((u) => !has(u));
+        const wholeGroup = groupsList.find((g) => g.id === view);
+        listBox.replaceChildren(
+          wholeGroup ? h('label', { class: 'row' }, h('input', { type: 'checkbox', checked: groupsPicked.has(view), onchange: (e) => { e.target.checked ? groupsPicked.add(view) : groupsPicked.delete(view); paint(); } }), h('b', `Whole group “${wholeGroup.name}”`), h('span', { class: 'small muted' }, ' · also students who join it later')) : null,
+          rows.length ? h('label', { class: 'row' }, h('input', { type: 'checkbox', checked: free.length > 0 && free.every((u) => picked.has(u.id)), disabled: !free.length, onchange: (e) => { free.forEach((u) => (e.target.checked ? picked.add(u.id) : picked.delete(u.id))); paint(); } }), h('b', 'Select everyone shown')) : h('p', { class: 'muted' }, 'Nobody here yet.'),
+          ...rows.map((u) => { const already = has(u) || groupsPicked.has(u.groupId); return h('label', { class: 'row', style: { opacity: already ? .6 : 1 } },
+            h('input', { type: 'checkbox', checked: already || picked.has(u.id), disabled: already, onchange: (e) => { e.target.checked ? picked.add(u.id) : picked.delete(u.id); paint(); } }),
+            avatarEl(u), h('span', h('b', u.fullName || u.displayName), h('span', { class: 'small muted' }, ` · ${groupName(u.groupId) || 'no group'}${already ? ' · already has access' : ''}`))); }));
+        count.textContent = `${picked.size} student${picked.size === 1 ? '' : 's'}${groupsPicked.size ? ` + ${groupsPicked.size} whole group${groupsPicked.size === 1 ? '' : 's'}` : ''} will get the full version`;
+      };
+      const err = h('p', { class: 'error', role: 'alert' });
+      sheet.append(h('h2', { class: 'h2' }, `Who gets the full “${lesson.title}”?`),
+        h('p', { class: 'muted', style: { margin: '6px 0 12px' } }, 'The file is hidden from everyone else, who only see the preview. Choose a group, then tick the students who should open it.'),
+        chips, listBox, count, err,
+        h('div', { class: 'row', style: { marginTop: '12px' } },
+          h('button', { class: 'btn primary', onclick: async () => {
+            err.textContent = '';
+            try {
+              for (const g of groupsPicked) await api.post('/api/admin/access', { lessonId: lesson.id, userId: 'group:' + g, grant: true });
+              for (const id of picked) await api.post('/api/admin/access', { lessonId: lesson.id, userId: id, grant: true });
+              if (picked.size || groupsPicked.size) toast('Access given', 'good');
+              close(); refresh();
+            } catch (ex) { err.textContent = ex.message; }
+          } }, 'Give access'),
+          h('button', { class: 'btn', onclick: close }, 'Not now')));
+      paint();
+    });
+  }
   const csvCell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   function download(name, text, type) {
     const a = h('a', { href: URL.createObjectURL(new Blob([text], { type })), download: name }); document.body.append(a); a.click(); a.remove();

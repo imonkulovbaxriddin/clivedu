@@ -4,8 +4,9 @@ import { api, net } from '../api.js';
 import { homeworkState, refreshHomework } from '../notify.js';
 import { shareSky } from '../share.js';
 import { t } from '../i18n.js';
+import { AVATARS, AVATAR_GROUPS } from '../avatars.js';
 
-const EMOJI = ['🦊', '🐼', '🦁', '🐯', '🐙', '🦄', '🐲', '🦉', '🐬', '🦋', '🐢', '🦖', '🚀', '🌟', '🎧', '🎨', '📚', '⚽', '🎸', '🌈', '🍀', '🔥', '🌙', '🧠'];
+const _OLD_EMOJI = ['🦊', '🐼', '🦁', '🐯', '🐙', '🦄', '🐲', '🦉', '🐬', '🦋', '🐢', '🦖', '🚀', '🌟', '🎧', '🎨', '📚', '⚽', '🎸', '🌈', '🍀', '🔥', '🌙', '🧠'];
 const COLORS = ['#7b6cff', '#2fd3b5', '#ff7a6b', '#ffb84d', '#4db8ff', '#f06bd0', '#8bd450', '#9a6bff'];
 
 export function render(root, _p, query) {
@@ -81,9 +82,11 @@ export function render(root, _p, query) {
     const draft = { displayName: u.displayName, bio: u.bio || '', goal: u.goal || '', avatar: { ...u.avatar } };
     const preview = h('div', { class: 'row' });
     const paintPreview = () => preview.replaceChildren(avatarEl({ avatar: draft.avatar }, { large: true }), h('div', h('b', { class: 'h2' }, draft.displayName || '…'), h('div', { class: 'muted' }, draft.bio)));
-    const emojiBox = h('div', { class: 'emoji-pick' }), colorBox = h('div', { class: 'swatches' }), frameBox = h('div', { class: 'seg' });
+    const emojiBox = h('div', { class: 'stack' }), colorBox = h('div', { class: 'swatches' }), frameBox = h('div', { class: 'seg' });
     const paintPickers = () => {
-      emojiBox.replaceChildren(...EMOJI.map((e) => h('button', { 'aria-pressed': String(draft.avatar.emoji === e), 'aria-label': `Avatar ${e}`, onclick: () => { draft.avatar.emoji = e; paintPickers(); paintPreview(); } }, e)));
+      emojiBox.replaceChildren(...AVATAR_GROUPS.map(([g, label]) => h('div', { class: 'stack', style: { gap: '8px' } }, h('div', { class: 'small muted' }, label),
+        h('div', { class: 'pics' }, AVATARS.filter((a) => a.group === g).map((a) => h('button', { type: 'button', 'aria-pressed': String(draft.avatar.pic === a.id), 'aria-label': a.label, title: a.label, onclick: () => { draft.avatar.pic = a.id; paintPickers(); paintPreview(); } },
+          avatarEl({ avatar: { ...draft.avatar, pic: a.id, frame: 'none' } })))))));
       colorBox.replaceChildren(...COLORS.map((c) => h('button', { class: 'swatch', style: { background: c }, 'aria-label': `Avatar colour ${c}`, 'aria-pressed': String(draft.avatar.color === c), onclick: () => { draft.avatar.color = c; paintPickers(); paintPreview(); } })));
       frameBox.replaceChildren(...[['ring', 'Ring'], ['glow', 'Glow'], ['dash', 'Dashed'], ['none', 'None']].map(([v, l]) => h('button', { 'aria-pressed': String(draft.avatar.frame === v), onclick: () => { draft.avatar.frame = v; paintPickers(); paintPreview(); } }, l)));
     };

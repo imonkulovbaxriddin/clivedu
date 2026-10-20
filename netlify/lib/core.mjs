@@ -21,6 +21,7 @@ const now = () => Date.now();
 const clean = (s, max = 200) => String(s ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, max);
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1'];
+const AVATAR_IDS = ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'm8', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7', 'n8'];
 const DEFAULT_GROUPS = [
   { id: 'beginner', name: 'Beginner', level: 'A1' },
   { id: 'elementary', name: 'Elementary', level: 'A2' },
@@ -101,7 +102,7 @@ export function createApp(db, env = () => undefined) {
     const role = await roleForNewUser(email);
     const user = {
       id, email, role, fullName, displayName: fullName.split(' ')[0] || fullName,
-      avatar: { emoji: '🦊', color: '#7b6cff', frame: 'ring' }, bio: '', goal: '',
+      avatar: { emoji: '🙂', pic: AVATAR_IDS[Math.floor(Math.random() * AVATAR_IDS.length)], color: '#7b6cff', frame: 'ring' }, bio: '', goal: '',
       created: now(), googleSub: googleSub || null, picture: picture || null,
       level: level || 'A1', levelSet: !!level, groupId: groupId || null, groupSet: !!groupId,
     };
@@ -302,6 +303,7 @@ export function createApp(db, env = () => undefined) {
     if (b.avatar && typeof b.avatar === 'object') {
       u.avatar = {
         emoji: clean(b.avatar.emoji, 8) || u.avatar.emoji,
+        pic: AVATAR_IDS.includes(b.avatar.pic) ? b.avatar.pic : (b.avatar.pic === '' ? '' : (u.avatar.pic || '')),
         color: /^#[0-9a-f]{6}$/i.test(b.avatar.color) ? b.avatar.color : u.avatar.color,
         frame: ['ring', 'glow', 'dash', 'none'].includes(b.avatar.frame) ? b.avatar.frame : u.avatar.frame,
       };

@@ -1,3 +1,4 @@
+import { avatarSvg, hasAvatar } from './avatars.js';
 import { getSettings } from './store.js';
 
 // DOM append/replaceChildren print the text "null" for null children. Make them skip null/false and flatten arrays.
@@ -159,9 +160,12 @@ export function nameScale(name) {
   return n > 26 ? 'clamp(.88rem, 4.4vw, 1.05rem)' : n > 20 ? 'clamp(1.1rem, 5.5vw, 1.4rem)' : n > 14 ? 'clamp(1.3rem, 6.5vw, 1.9rem)' : '';
 }
 export function avatarEl(user, { large = false } = {}) {
-  const a = user?.avatar || { emoji: '🦊', color: '#7b6cff', frame: 'ring' };
+  const a = user?.avatar || { emoji: '🙂', color: '#7b6cff', frame: 'ring' };
   const el = h('span', { class: `avatar${large ? ' lg' : ''}`, 'data-frame': a.frame, style: { background: `linear-gradient(145deg, ${a.color}, color-mix(in oklab, ${a.color} 55%, #000))`, color: a.color }, 'aria-hidden': 'true' });
-  const inner = h('span', { style: { color: '#fff' } }, a.emoji);
-  el.append(inner);
+  if (a.pic && hasAvatar(a.pic)) {
+    el.classList.add('pic');
+    const art = h('span', { class: 'art' }); art.innerHTML = avatarSvg(a.pic);   // our own drawings, never user text
+    el.append(art);
+  } else el.append(h('span', { style: { color: '#fff' } }, a.emoji));
   return el;
 }

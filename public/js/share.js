@@ -2,6 +2,7 @@
 // Progress stays in localStorage; only the summary numbers go into the link.
 import { h, modal, toast, icon } from './ui.js';
 import { D, getUser, level, BADGES, allWords } from './store.js';
+import { avatarImage } from './avatars.js';
 
 const b64 = (o) => btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 export const unb64 = (s) => { try { return JSON.parse(decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/'))))); } catch { return null; } };
@@ -12,7 +13,7 @@ export function summary() {
   const boxes = allWords().map((w) => d.words[w.key]?.box || 0);
   return {
     n: u?.displayName || 'A ClivEdu learner',
-    e: u?.avatar?.emoji || '🦊', c: u?.avatar?.color || '#7b6cff',
+    e: u?.avatar?.emoji || '🙂', p: u?.avatar?.pic || '', c: u?.avatar?.color || '#7b6cff',
     l: lv.lv, x: d.xp, s: d.streak.count, w: Object.keys(d.words).length, m: Object.values(d.words).filter((x) => x.box >= 5).length,
     b: d.badges.length, bb: d.badges.slice(0, 8), k: boxes.slice(0, 80).join(''),
   };
@@ -54,7 +55,10 @@ export function drawCard(canvas, s) {
   // avatar + name
   ctx.beginPath(); ctx.arc(160, 190, 86, 0, 7); ctx.fillStyle = s.c; ctx.fill();
   ctx.lineWidth = 6; ctx.strokeStyle = '#ffffff55'; ctx.stroke();
-  ctx.font = '96px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(s.e, 160, 196);
+  ctx.font = '96px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const pic = s.p && avatarImage(s.p, () => drawCard(canvas, s));
+  if (pic) { ctx.save(); ctx.beginPath(); ctx.arc(160, 190, 83, 0, 7); ctx.clip(); ctx.drawImage(pic, 74, 104, 172, 172); ctx.restore(); }
+  else if (!s.p) ctx.fillText(s.e, 160, 196);
   ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#f1eeff';
   let nameSize = 76, nameText = String(s.n || '');
   const setNameFont = () => { ctx.font = `800 ${nameSize}px "Bricolage Grotesque", system-ui, sans-serif`; };
